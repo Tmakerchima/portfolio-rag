@@ -2,9 +2,6 @@ target/
 *.class
 *.jar
 
-# 包含数据库密码和 API Key，不提交
-src/main/resources/application.yml
-
 # 本地开发用的覆盖配置
 src/main/resources/application-local.yml
 
