@@ -9,13 +9,20 @@ interface Source {
   score: number
 }
 
+interface ToolUsage {
+  origin: string
+  name: string
+}
+
 const SOURCES_MARKER = '@@SOURCES@@'
+const TOOLS_MARKER = '@@TOOLS@@'
 
 const question = ref('')
 const answer = ref('')
 const loading = ref(false)
 const sourcesOpen = ref(false)
 const sources = ref<Source[]>([])
+const toolsUsed = ref<ToolUsage[]>([])
 
 const presets = [
   '四年 Java 经验里最自豪的项目?',
@@ -32,8 +39,7 @@ async function ask(q?: string) {
   loading.value = true
   sourcesOpen.value = false
   sources.value = []
-
-  let firstFrame = true
+  toolsUsed.value = []
 
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
@@ -58,16 +64,28 @@ async function ask(q?: string) {
         if (!line.startsWith('data:')) continue
         const content = line.slice(5)
 
-        if (firstFrame) {
-          firstFrame = false
-          if (content.startsWith(SOURCES_MARKER)) {
-            try {
-              sources.value = JSON.parse(content.slice(SOURCES_MARKER.length))
-            } catch {
-              sources.value = []
-            }
-            continue
+        if (content.startsWith(SOURCES_MARKER)) {
+          try {
+            sources.value = JSON.parse(content.slice(SOURCES_MARKER.length))
+          } catch {
+            sources.value = []
           }
+          continue
+        }
+
+        if (content.startsWith(TOOLS_MARKER)) {
+          try {
+            const raw: string[] = JSON.parse(content.slice(TOOLS_MARKER.length))
+            toolsUsed.value = raw.map((s) => {
+              const idx = s.indexOf(':')
+              return idx >= 0
+                ? { origin: s.slice(0, idx), name: s.slice(idx + 1) }
+                : { origin: s, name: '' }
+            })
+          } catch {
+            toolsUsed.value = []
+          }
+          continue
         }
 
         answer.value += content
@@ -138,6 +156,23 @@ async function ask(q?: string) {
       <!-- 流式回答 -->
       <div v-if="answer" class="mt-10">
         <div class="text-[#111111] dark:text-[#f5f5f5] text-base leading-relaxed whitespace-pre-wrap">{{ answer }}</div>
+
+        <!-- 本轮回答用到的能力：RAG 检索 / Function Calling / MCP -->
+        <div v-if="sources.length || toolsUsed.length" class="mt-4 flex flex-wrap gap-2">
+          <span
+            v-if="sources.length"
+            class="text-xs px-2 py-1 border border-[#dddddd] dark:border-[#333333] text-[#666666] dark:text-[#999999]"
+          >
+            🔍 RAG 检索
+          </span>
+          <span
+            v-for="(t, i) in toolsUsed"
+            :key="i"
+            class="text-xs px-2 py-1 border border-[#dddddd] dark:border-[#333333] text-[#666666] dark:text-[#999999]"
+          >
+            {{ t.origin === 'mcp' ? '🔌 MCP' : '⚙️ Function Calling' }}{{ t.name ? ' · ' + t.name : '' }}
+          </span>
+        </div>
 
         <!-- 可折叠 Sources 面板 -->
         <div v-if="sources.length" class="mt-8 border-t border-[#eeeeee] dark:border-[#222222] pt-4">

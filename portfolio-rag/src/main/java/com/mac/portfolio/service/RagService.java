@@ -1,6 +1,7 @@
 package com.mac.portfolio.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mac.portfolio.tool.ToolUsageTrackingCallback;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.document.Document;
@@ -12,12 +13,14 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class RagService {
 
-    // 流式响应的第一个 data 帧用这个前缀标记，前端据此区分"引用来源"和"正文回答"
+    // 流式响应的 data 帧用这两个前缀区分：检索到的简历片段（RAG）、本轮实际调用的工具（Function Calling / MCP）
     private static final String SOURCES_MARKER = "@@SOURCES@@";
+    private static final String TOOLS_MARKER = "@@TOOLS@@";
 
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
@@ -40,15 +43,21 @@ public class RagService {
         Mono<String> sourcesFrame = Mono.fromCallable(() -> vectorStore.similaritySearch(searchRequest))
                 .map(this::toSourcesFrame);
 
+        // 本轮请求专属的容器：哪些工具被实际调用，由 ToolUsageTrackingCallback 在执行时写入
+        List<String> invokedTools = new CopyOnWriteArrayList<>();
+
         Flux<String> answer = chatClient.prompt()
                 .user(question)
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(searchRequest)
                         .build())
+                .toolContext(Map.of(ToolUsageTrackingCallback.CONTEXT_KEY, invokedTools))
                 .stream()
                 .content();
 
-        return Flux.concat(sourcesFrame, answer);
+        Mono<String> toolsFrame = Mono.fromSupplier(() -> toToolsFrame(invokedTools));
+
+        return Flux.concat(sourcesFrame, answer, toolsFrame);
     }
 
     private String toSourcesFrame(List<Document> documents) {
@@ -62,6 +71,14 @@ public class RagService {
             return SOURCES_MARKER + objectMapper.writeValueAsString(sources);
         } catch (Exception e) {
             return SOURCES_MARKER + "[]";
+        }
+    }
+
+    private String toToolsFrame(List<String> invokedTools) {
+        try {
+            return TOOLS_MARKER + objectMapper.writeValueAsString(invokedTools);
+        } catch (Exception e) {
+            return TOOLS_MARKER + "[]";
         }
     }
 

@@ -23,10 +23,20 @@ spring:
         distance-type: COSINE_DISTANCE
         dimensions: 1024
         initialize-schema: true
+    mcp:
+      client:
+        streamable-http:
+          connections:
+            github:
+              # GitHub 官方远程托管 MCP Server
+              url: https://api.githubcopilot.com/mcp/
 
 # 自定义配置：简历知识库路径
 portfolio:
   knowledge-path: classpath:knowledge/**/*
+
+github:
+  mcp-pat: ${GITHUB_MCP_PAT}
 
 logging:
   level:
