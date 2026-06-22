@@ -59,6 +59,14 @@
             <artifactId>spring-ai-tika-document-reader</artifactId>
         </dependency>
 
+        <!-- 强制锁定版本：传递依赖解析出的 3.14.0 缺少 commons-compress 1.28 需要的方法，
+             导致 IngestService 用 Tika 解析文件时报 NoSuchMethodError -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.17.0</version>
+        </dependency>
+
         <!-- Spring AI：PGVector 向量存储（持久化到 Supabase Postgres） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>

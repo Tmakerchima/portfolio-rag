@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 import org.springframework.web.reactive.config.CorsRegistry;
 import org.springframework.web.reactive.config.WebFluxConfigurer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -20,6 +22,8 @@ import java.util.List;
 
 @Configuration
 public class AiConfig implements WebFluxConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(AiConfig.class);
 
     @Value("classpath:prompts/interview-system.st")
     private Resource systemPromptResource;
@@ -34,8 +38,15 @@ public class AiConfig implements WebFluxConfigurer {
         for (ToolCallback callback : ToolCallbacks.from(portfolioInfoTools)) {
             trackedCallbacks.add(new ToolUsageTrackingCallback(callback, "function-calling"));
         }
-        for (ToolCallback callback : mcpTools.getToolCallbacks()) {
-            trackedCallbacks.add(new ToolUsageTrackingCallback(callback, "mcp"));
+
+        // GitHub 远程 MCP Server 偶发连接慢/超时，这里握手失败时不能让整个应用起不来——
+        // 降级为没有 MCP 工具，RAG 和 Function Calling 照常工作
+        try {
+            for (ToolCallback callback : mcpTools.getToolCallbacks()) {
+                trackedCallbacks.add(new ToolUsageTrackingCallback(callback, "mcp"));
+            }
+        } catch (Exception e) {
+            log.warn("GitHub MCP Server 连接失败，本次启动跳过 MCP 工具：{}", e.getMessage());
         }
 
         return builder.defaultSystem(systemPrompt)

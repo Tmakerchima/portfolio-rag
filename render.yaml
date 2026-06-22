@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: portfolio-rag
+    runtime: docker
+    rootDir: portfolio-rag
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DASHSCOPE_API_KEY
+        sync: false
+      - key: SUPABASE_DB_PASSWORD
+        sync: false
+      - key: GITHUB_MCP_PAT
+        sync: false
