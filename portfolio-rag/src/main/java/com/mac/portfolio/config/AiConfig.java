@@ -1,5 +1,6 @@
 package com.mac.portfolio.config;
 
+import com.mac.portfolio.tool.PortfolioInfoTools;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -18,9 +19,11 @@ public class AiConfig implements WebFluxConfigurer {
     private Resource systemPromptResource;
 
     @Bean
-    public ChatClient chatClient(ChatClient.Builder builder) throws IOException {
+    public ChatClient chatClient(ChatClient.Builder builder, PortfolioInfoTools portfolioInfoTools) throws IOException {
         String systemPrompt = systemPromptResource.getContentAsString(StandardCharsets.UTF_8);
-        return builder.defaultSystem(systemPrompt).build();
+        return builder.defaultSystem(systemPrompt)
+                .defaultTools(portfolioInfoTools)
+                .build();
     }
 
     // 开发期允许所有来源跨域，上线后改为前端域名
