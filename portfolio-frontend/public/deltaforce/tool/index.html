@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三角洲经济助手 · 实时交易行 AI 算账</title>
+  <style>
+    :root { --bg:#0f1115; --card:#181b22; --line:#262b35; --fg:#e6e9ef; --mut:#9aa3b2; --acc:#e8b13a; --acc2:#3a7bd5; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.7 -apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif; }
+    .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+    header { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+    header h1 { font-size:20px; margin:0; }
+    header .tag { color:var(--mut); font-size:12px; }
+    .sub { color:var(--mut); font-size:13px; margin-bottom:18px; }
+    .tabs { display:flex; gap:8px; margin-bottom:14px; }
+    .tabs button { background:var(--card); color:var(--mut); border:1px solid var(--line); padding:8px 14px; border-radius:8px; cursor:pointer; font-size:14px; }
+    .tabs button.on { color:var(--bg); background:var(--acc); border-color:var(--acc); font-weight:600; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+    .row { display:flex; gap:8px; }
+    textarea, input { flex:1; background:#0c0e13; color:var(--fg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font:inherit; resize:vertical; }
+    .btn { background:var(--acc2); color:#fff; border:none; border-radius:8px; padding:0 18px; cursor:pointer; font-size:14px; white-space:nowrap; }
+    .btn.gold { background:var(--acc); color:#1a1300; font-weight:700; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .hint { color:var(--mut); font-size:12px; margin-top:8px; }
+    .out { margin-top:16px; }
+    .bubble { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-top:12px; white-space:pre-wrap; word-break:break-word; }
+    .bubble.me { border-color:#33415e; background:#141a26; }
+    .bubble .who { color:var(--mut); font-size:12px; margin-bottom:6px; }
+    .bubble b { color:var(--acc); }
+    .spin { color:var(--mut); font-size:13px; margin-top:12px; }
+    .copy { float:right; background:none; border:1px solid var(--line); color:var(--mut); border-radius:6px; font-size:12px; padding:2px 8px; cursor:pointer; }
+    .bubble .shot { max-width:100%; border:1px solid var(--line); border-radius:8px; margin:6px 0; }
+    .bubble a { color:var(--acc2); word-break:break-all; }
+
+    /* Mobile: stack input + button, bigger tap targets, no zoom-on-focus */
+    @media (max-width:560px){
+      .wrap { padding:16px 12px 56px; }
+      header h1 { font-size:18px; }
+      .row { flex-direction:column; }
+      textarea, input { font-size:16px; }            /* >=16px stops iOS auto-zoom */
+      .btn { width:100%; padding:12px 18px; }
+      .tabs button { flex:1; padding:10px 8px; }
+      .bubble { padding:12px 13px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>三角洲经济助手</h1><span class="tag">实时交易行 · AI 算账</span>
+  </header>
+
+  <div class="tabs">
+    <button id="tabDaily" class="on" onclick="show('daily')">📈 今日建议</button>
+    <button id="tabAsk" onclick="show('ask')">💬 随便问</button>
+  </div>
+
+  <!-- 今日建议 -->
+  <section id="paneDaily">
+    <div class="card">
+      <button class="btn gold" id="genBtn" onclick="genDaily()">一键生成今日倒卖建议</button>
+      <div class="hint">扫描子弹 / 钥匙卡 / 枪械 / 配件的实时行情，生成一段可直接复制去发的成品文案。</div>
+    </div>
+    <div id="dailyOut" class="out"></div>
+  </section>
+
+  <!-- 随便问 -->
+  <section id="paneAsk" style="display:none">
+    <div class="card">
+      <div class="row">
+        <textarea id="q" rows="2" placeholder="例如：我有500万哈夫币，今晚2小时想稳赚，子弹买什么？"></textarea>
+        <button class="btn" id="askBtn" onclick="ask()">问</button>
+      </div>
+      <div class="hint">Ctrl+Enter 发送。助手会自动查实时价、按扣费后利润给人话建议。</div>
+    </div>
+    <div id="askOut" class="out"></div>
+  </section>
+</div>
+
+<!-- 后端地址配置：Vercel 部署前在 config.js 里填 Railway 公网域名 -->
+<script src="config.js"></script>
+<script>
+  function show(t){
+    document.getElementById('paneDaily').style.display = t==='daily'?'':'none';
+    document.getElementById('paneAsk').style.display  = t==='ask' ?'':'none';
+    document.getElementById('tabDaily').className = t==='daily'?'on':'';
+    document.getElementById('tabAsk').className   = t==='ask' ?'on':'';
+  }
+  // Minimal, dependency-free markdown: image URLs -> <img>, **bold**, escape HTML.
+  function fmt(s){
+    let esc = (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    esc = esc.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+    // Render image links (e.g. 改枪效果图) inline; other URLs become clickable links.
+    esc = esc.replace(/https?:\/\/[^\s）)]+\.(?:png|jpg|jpeg|webp|gif)/gi,
+                      u => '<br><img class="shot" src="'+u+'" loading="lazy"><br>');
+    esc = esc.replace(/(https?:\/\/[^\s<）)]+)(?![^<]*>)/g, u => '<a href="'+u+'" target="_blank">'+u+'</a>');
+    return esc;
+  }
+  function bubble(container, who, text, mine){
+    const d = document.createElement('div');
+    d.className = 'bubble' + (mine?' me':'');
+    const copy = mine ? '' : '<button class="copy" onclick="copyText(this)">复制</button>';
+    d.innerHTML = '<div class="who">'+who+copy+'</div>'+fmt(text);
+    container.appendChild(d);
+    d.scrollIntoView({behavior:'smooth', block:'nearest'});
+    return d;
+  }
+  function copyText(btn){
+    const t = btn.closest('.bubble').innerText.replace(/^.*\n复制\n?/,'').replace(/^助手\n?|^今日建议\n?/,'');
+    navigator.clipboard.writeText(btn.closest('.bubble').innerText.replace(/复制/,'').trim());
+    btn.textContent='已复制'; setTimeout(()=>btn.textContent='复制',1200);
+  }
+
+  // API 基址：指向后端 Railway 的绝对地址（在 config.js 里设 window.API_BASE）。
+  // 跨域由后端 CORS 放行（app.cors.allowed-origins）。未配置则回退同源 /api（仅本地/反代用）。
+  const API = ((window.API_BASE || location.origin).replace(/\/+$/, '')) + '/api';
+  if (!window.API_BASE) console.warn('[config] 未设置 window.API_BASE（见 config.js）——当前用同源 /api。部署到 Vercel 必须填后端 Railway 地址，否则接口 404。');
+
+  async function genDaily(){
+    const out = document.getElementById('dailyOut'); out.innerHTML='';
+    const btn = document.getElementById('genBtn'); btn.disabled=true;
+    const s = document.createElement('div'); s.className='spin'; s.textContent='正在拉实时行情 + 让 AI 写文案…'; out.appendChild(s);
+    try{
+      const r = await fetch(API+'/daily'); const j = await r.json();
+      out.innerHTML='';
+      bubble(out, '今日建议', j.text, false);
+    }catch(e){ out.innerHTML=''; bubble(out,'错误','请求失败：'+e,false); }
+    btn.disabled=false;
+  }
+
+  async function ask(){
+    const q = document.getElementById('q'); const text=q.value.trim(); if(!text) return;
+    const out = document.getElementById('askOut');
+    const btn = document.getElementById('askBtn'); btn.disabled=true;
+    bubble(out,'你',text,true); q.value='';
+    const s = document.createElement('div'); s.className='spin'; s.textContent='思考中…'; out.appendChild(s);
+
+    // POST (reliable UTF-8) + read the streamed SSE frames token-by-token.
+    let acc=''; let el=null;
+    const render = ()=>{
+      if(s.parentNode) s.remove();
+      if(!el) el = bubble(out,'助手','',false);
+      el.innerHTML = '<div class="who">助手<button class="copy" onclick="copyText(this)">复制</button></div>'+fmt(acc);
+      el.scrollIntoView({behavior:'smooth', block:'nearest'});
+    };
+    try{
+      const resp = await fetch(API+'/ask-stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:text})});
+      const reader = resp.body.getReader(); const dec = new TextDecoder('utf-8');
+      let buf='';
+      while(true){
+        const {value,done} = await reader.read(); if(done) break;
+        buf += dec.decode(value,{stream:true});
+        let i;
+        while((i=buf.indexOf('\n\n'))>=0){
+          const frame=buf.slice(0,i); buf=buf.slice(i+2);
+          let ev='message', data='';
+          for(const ln of frame.split('\n')){
+            if(ln.startsWith('event:')) ev=ln.slice(6).trim();
+            else if(ln.startsWith('data:')) data+=ln.slice(5);
+          }
+          if(ev!=='done' && data){ acc+=data; render(); }
+        }
+      }
+      if(!el) bubble(out,'助手',acc||'（无内容）',false);
+    }catch(e){ if(s.parentNode) s.remove(); bubble(out,'助手','请求失败：'+e,false); }
+    btn.disabled=false;
+  }
+  document.getElementById('q').addEventListener('keydown',e=>{ if(e.ctrlKey && e.key==='Enter') ask(); });
+</script>
+</body>
+</html>
