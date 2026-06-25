@@ -3,185 +3,509 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>三角洲经济助手 · 实时交易行 AI 算账</title>
+  <title>三角洲问答助手</title>
   <style>
-    /* Anthropic 风格：暖米色背景 + 陶土橙 + 衬线大标题（系统字体，不依赖外网/Google Fonts）。 */
     :root {
-      --bg:#F0EEE6; --surface:#FBFAF7; --line:#E4E1D6;
-      --fg:#1A1A18; --mut:#6F6C64; --acc:#CC785C; --acc-d:#B5634A;
+      --bg: #0f1115;
+      --sidebar-bg: #161920;
+      --card: #1e2128;
+      --line: #262c38;
+      --fg: #e6e9ef;
+      --mut: #7a8499;
+      --acc: #e8b13a;
+      --acc2: #3a7bd5;
+      --user-bg: #17251c;
+      --user-border: #253d2c;
+      --user-fg: #c8edce;
     }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--fg);
-      font:16px/1.72 -apple-system,"Segoe UI",Roboto,"Helvetica Neue","Microsoft YaHei",sans-serif;
-      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
-    .serif { font-family:Georgia,"Times New Roman","Songti SC","STSong",serif; }
-    .wrap { max-width:720px; margin:0 auto; padding:56px 20px 80px; }
-    header { margin-bottom:34px; }
-    header h1 { font-family:Georgia,"Songti SC","STSong",serif; font-weight:500;
-      font-size:34px; line-height:1.15; letter-spacing:-.015em; margin:0 0 12px; }
-    header .tag { display:block; color:var(--mut); font-size:15px; line-height:1.6; max-width:34em; }
-    .tabs { display:flex; gap:26px; margin-bottom:22px; border-bottom:1px solid var(--line); }
-    .tabs button { background:none; color:var(--mut); border:none; border-bottom:2px solid transparent;
-      padding:9px 1px; margin-bottom:-1px; cursor:pointer; font-size:15px; }
-    .tabs button.on { color:var(--fg); border-bottom-color:var(--acc); font-weight:600; }
-    .card { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px; }
-    .row { display:flex; gap:10px; }
-    textarea, input { flex:1; background:#fff; color:var(--fg); border:1px solid var(--line);
-      border-radius:10px; padding:12px 14px; font:inherit; resize:vertical; }
-    textarea:focus, input:focus { outline:none; border-color:var(--acc); box-shadow:0 0 0 3px rgba(204,120,92,.15); }
-    .btn { background:var(--acc); color:#fff; border:none; border-radius:10px; padding:0 22px;
-      height:44px; cursor:pointer; font-size:15px; font-weight:600; white-space:nowrap; transition:background .15s; }
-    .btn:hover:not(:disabled) { background:var(--acc-d); }
-    .btn.gold { background:var(--acc); color:#fff; height:auto; padding:13px 22px; }
-    .btn:disabled { opacity:.45; cursor:not-allowed; }
-    .hint { color:var(--mut); font-size:13px; margin-top:10px; line-height:1.6; }
-    .out { margin-top:20px; }
-    .bubble { background:var(--surface); border:1px solid var(--line); border-radius:16px;
-      padding:16px 18px; margin-top:14px; white-space:pre-wrap; word-break:break-word; }
-    .bubble.me { background:#EAE7DC; border-color:#DEDACE; }
-    .bubble .who { color:var(--mut); font-size:12px; margin-bottom:8px; letter-spacing:.02em; }
-    .bubble b { color:var(--acc-d); }
-    .spin { color:var(--mut); font-size:14px; margin-top:14px; }
-    .copy { float:right; background:none; border:1px solid var(--line); color:var(--mut);
-      border-radius:8px; font-size:12px; padding:3px 10px; cursor:pointer; }
-    .copy:hover { border-color:var(--acc); color:var(--acc-d); }
-    .bubble .shot { max-width:100%; border:1px solid var(--line); border-radius:10px; margin:8px 0; }
-    .bubble a { color:var(--acc-d); word-break:break-all; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font: 15px/1.7 -apple-system, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+      display: flex;
+      overflow: hidden;
+    }
 
-    /* Mobile: stack input + button, bigger tap targets, no zoom-on-focus */
-    @media (max-width:560px){
-      .wrap { padding:32px 16px 64px; }
-      header h1 { font-size:27px; }
-      .row { flex-direction:column; }
-      textarea, input { font-size:16px; }            /* >=16px stops iOS auto-zoom */
-      .btn { width:100%; height:48px; }
-      .bubble { padding:14px 15px; }
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 230px;
+      min-width: 230px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-top {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .new-btn {
+      width: 100%;
+      background: var(--acc2);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: background .15s;
+    }
+    .new-btn:hover { background: #2d6bc4; }
+    .conv-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 8px;
+    }
+    .conv-list::-webkit-scrollbar { width: 4px; }
+    .conv-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+    .conv-item {
+      padding: 8px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--mut);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+      user-select: none;
+    }
+    .conv-item:hover { background: var(--card); color: var(--fg); }
+    .conv-item.active { background: var(--card); color: var(--fg); }
+    .sidebar-footer {
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--mut);
+    }
+
+    /* ── Main ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* ── Messages ── */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .messages::-webkit-scrollbar { width: 5px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--mut);
+      padding: 32px 24px;
+    }
+    .empty-icon { font-size: 40px; }
+    .empty-title { font-size: 20px; color: var(--fg); font-weight: 600; }
+    .empty-sub { font-size: 13px; margin-bottom: 8px; }
+    .suggestions { display: flex; flex-direction: column; gap: 7px; width: 100%; max-width: 480px; }
+    .suggestion {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font: inherit;
+      cursor: pointer;
+      color: var(--fg);
+      text-align: left;
+      transition: border-color .15s;
+    }
+    .suggestion:hover { border-color: var(--acc2); color: var(--acc2); }
+
+    /* Message row */
+    .msg-row {
+      padding: 4px 24px;
+      display: flex;
+      flex-direction: column;
+      max-width: 820px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .msg-label {
+      font-size: 12px;
+      color: var(--mut);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .label-tag {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+    }
+    .msg-row.user .label-tag { background: var(--user-bg); border-color: var(--user-border); color: var(--user-fg); }
+
+    /* Bubble */
+    .bubble {
+      display: inline-block;
+      max-width: 82%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      word-break: break-word;
+      line-height: 1.65;
+    }
+    .msg-row.user .bubble {
+      background: var(--user-bg);
+      border: 1px solid var(--user-border);
+      color: var(--user-fg);
+      white-space: pre-wrap;
+    }
+    .msg-row.assistant .bubble {
+      background: var(--card);
+      border: 1px solid var(--line);
+      white-space: pre-wrap;
+    }
+    .bubble b { color: var(--acc); }
+    .bubble a { color: var(--acc2); word-break: break-all; }
+    .bubble .shot { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; display: block; }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--line);
+      color: var(--mut);
+      border-radius: 5px;
+      font-size: 11px;
+      padding: 1px 7px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+    .copy-btn:hover { color: var(--fg); border-color: var(--fg); }
+
+    .thinking-row {
+      padding: 6px 24px;
+      max-width: 820px;
+      margin: 0 auto;
+      width: 100%;
+      color: var(--mut);
+      font-size: 13px;
+    }
+
+    /* ── Input ── */
+    .input-area {
+      padding: 12px 24px 20px;
+      max-width: 820px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .input-box {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 8px 8px 14px;
+      transition: border-color .15s;
+    }
+    .input-box:focus-within { border-color: var(--acc2); }
+    .input-box textarea {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--fg);
+      font: inherit;
+      font-size: 15px;
+      resize: none;
+      line-height: 1.6;
+      max-height: 180px;
+      padding: 2px 0;
+    }
+    .input-box textarea::placeholder { color: var(--mut); }
+    .send-btn {
+      background: var(--acc2);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 16px;
+      transition: background .15s;
+    }
+    .send-btn:hover:not(:disabled) { background: #2d6bc4; }
+    .send-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .input-hint { font-size: 12px; color: var(--mut); margin-top: 6px; text-align: center; }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      .sidebar { display: none; }
+      .msg-row, .thinking-row { padding: 4px 12px; }
+      .input-area { padding: 10px 12px 16px; }
+      .bubble { max-width: 95%; }
     }
   </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>三角洲经济助手</h1>
-    <span class="tag">实时交易行行情，AI 替你算清扣费后的利润，直接告诉你今天买什么、配什么。</span>
-  </header>
 
-  <div class="tabs">
-    <button id="tabDaily" class="on" onclick="show('daily')">今日建议</button>
-    <button id="tabAsk" onclick="show('ask')">随便问</button>
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-top">
+    <button class="new-btn" onclick="newChat()">✏ 新建对话</button>
   </div>
+  <div class="conv-list" id="convList"></div>
+  <div class="sidebar-footer">三角洲问答助手</div>
+</aside>
 
-  <!-- 今日建议 -->
-  <section id="paneDaily">
-    <div class="card">
-      <button class="btn gold" id="genBtn" onclick="genDaily()">一键生成今日倒卖建议</button>
-      <div class="hint">扫描子弹 / 钥匙卡 / 枪械 / 配件的实时行情，生成一段可直接复制去发的成品文案。</div>
+<!-- Main -->
+<div class="main">
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <div class="input-box">
+      <textarea id="q" rows="1"
+        placeholder="问我任何关于三角洲的问题…"
+        oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="send()" title="发送 (Ctrl+Enter)">▶</button>
     </div>
-    <div id="dailyOut" class="out"></div>
-  </section>
-
-  <!-- 随便问 -->
-  <section id="paneAsk" style="display:none">
-    <div class="card">
-      <div class="row">
-        <textarea id="q" rows="2" placeholder="例如：我有500万哈夫币，今晚2小时想稳赚，子弹买什么？"></textarea>
-        <button class="btn" id="askBtn" onclick="ask()">问</button>
-      </div>
-      <div class="hint">Ctrl+Enter 发送。助手会自动查实时价、按扣费后利润给人话建议。</div>
-    </div>
-    <div id="askOut" class="out"></div>
-  </section>
+    <div class="input-hint">Ctrl+Enter 发送 · 数据来自数据帝实时行情</div>
+  </div>
 </div>
 
-<!-- 后端地址内联（避免相对路径 config.js 在无结尾斜杠访问时 404 导致接口失效）-->
-<script>window.API_BASE = "https://deltaforcetools-production.up.railway.app";</script>
+<script src="config.js"></script>
 <script>
-  function show(t){
-    document.getElementById('paneDaily').style.display = t==='daily'?'':'none';
-    document.getElementById('paneAsk').style.display  = t==='ask' ?'':'none';
-    document.getElementById('tabDaily').className = t==='daily'?'on':'';
-    document.getElementById('tabAsk').className   = t==='ask' ?'on':'';
-  }
-  // Minimal, dependency-free markdown: image URLs -> <img>, **bold**, escape HTML.
-  function fmt(s){
-    let esc = (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    esc = esc.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
-    // Render image links (e.g. 改枪效果图) inline; other URLs become clickable links.
-    esc = esc.replace(/https?:\/\/[^\s）)]+\.(?:png|jpg|jpeg|webp|gif)/gi,
-                      u => '<br><img class="shot" src="'+u+'" loading="lazy"><br>');
-    esc = esc.replace(/(https?:\/\/[^\s<）)]+)(?![^<]*>)/g, u => '<a href="'+u+'" target="_blank">'+u+'</a>');
-    return esc;
-  }
-  function bubble(container, who, text, mine){
-    const d = document.createElement('div');
-    d.className = 'bubble' + (mine?' me':'');
-    const copy = mine ? '' : '<button class="copy" onclick="copyText(this)">复制</button>';
-    d.innerHTML = '<div class="who">'+who+copy+'</div>'+fmt(text);
-    container.appendChild(d);
-    d.scrollIntoView({behavior:'smooth', block:'nearest'});
-    return d;
-  }
-  function copyText(btn){
-    const t = btn.closest('.bubble').innerText.replace(/^.*\n复制\n?/,'').replace(/^助手\n?|^今日建议\n?/,'');
-    navigator.clipboard.writeText(btn.closest('.bubble').innerText.replace(/复制/,'').trim());
-    btn.textContent='已复制'; setTimeout(()=>btn.textContent='复制',1200);
+// ── API base ──
+const API = ((window.API_BASE || location.origin).replace(/\/+$/, '')) + '/api';
+
+// ── Storage ──
+let convs = JSON.parse(localStorage.getItem('df_convs') || '[]');
+let curId = null;
+
+function save() { localStorage.setItem('df_convs', JSON.stringify(convs)); }
+function getConv(id) { return convs.find(c => c.id === id); }
+
+// ── Markdown ──
+function fmt(s) {
+  let e = (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  e = e.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  e = e.replace(/https?:\/\/[^\s）)]+\.(?:png|jpg|jpeg|webp|gif)/gi,
+                u => '<br><img class="shot" src="' + u + '" loading="lazy"><br>');
+  e = e.replace(/(https?:\/\/[^\s<）)]+)(?![^<]*>)/g,
+                u => '<a href="' + u + '" target="_blank">' + u + '</a>');
+  return e;
+}
+
+// ── Render ──
+function showEmpty() {
+  const el = document.getElementById('messages');
+  el.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">🎮</div>
+      <div class="empty-title">三角洲问答助手</div>
+      <div class="empty-sub">实时行情 · 配装建议 · 改枪码</div>
+      <div class="suggestions">
+        <button class="suggestion" onclick="fillSend('我有500万哈夫币，今天买什么子弹划算？')">我有500万哈夫币，今天买什么子弹划算？</button>
+        <button class="suggestion" onclick="fillSend('帮我配绝密航天卡战备，要改枪码')">帮我配绝密航天卡战备，要改枪码</button>
+        <button class="suggestion" onclick="fillSend('机密大坝凑战备，预算150万')">机密大坝凑战备，预算150万</button>
+        <button class="suggestion" onclick="fillSend('绝密巴克什跑刀，给改枪码')">绝密巴克什跑刀，给改枪码</button>
+      </div>
+    </div>`;
+}
+
+function renderMessages(conv) {
+  const el = document.getElementById('messages');
+  el.innerHTML = '';
+  if (!conv || conv.msgs.length === 0) { showEmpty(); return; }
+  for (const m of conv.msgs) appendRow(m.role, m.text, false);
+  el.scrollTop = el.scrollHeight;
+}
+
+function appendRow(role, text, scroll) {
+  const el = document.getElementById('messages');
+  const es = el.querySelector('.empty-state');
+  if (es) es.remove();
+
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + role;
+
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  const tag = document.createElement('span');
+  tag.className = 'label-tag';
+  tag.textContent = role === 'user' ? '你' : '助手';
+  label.appendChild(tag);
+  if (role === 'assistant') {
+    const cp = document.createElement('button');
+    cp.className = 'copy-btn';
+    cp.textContent = '复制';
+    cp.onclick = () => { navigator.clipboard.writeText(text); cp.textContent = '已复制'; setTimeout(() => cp.textContent = '复制', 1300); };
+    label.appendChild(cp);
   }
 
-  // API 基址：指向后端 Railway 的绝对地址（在 config.js 里设 window.API_BASE）。
-  // 跨域由后端 CORS 放行（app.cors.allowed-origins）。未配置则回退同源 /api（仅本地/反代用）。
-  const API = ((window.API_BASE || location.origin).replace(/\/+$/, '')) + '/api';
-  if (!window.API_BASE) console.warn('[config] 未设置 window.API_BASE（见 config.js）——当前用同源 /api。部署到 Vercel 必须填后端 Railway 地址，否则接口 404。');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = fmt(text);
 
-  async function genDaily(){
-    const out = document.getElementById('dailyOut'); out.innerHTML='';
-    const btn = document.getElementById('genBtn'); btn.disabled=true;
-    const s = document.createElement('div'); s.className='spin'; s.textContent='正在拉实时行情 + 让 AI 写文案…'; out.appendChild(s);
-    try{
-      const r = await fetch(API+'/daily'); const j = await r.json();
-      out.innerHTML='';
-      bubble(out, '今日建议', j.text, false);
-    }catch(e){ out.innerHTML=''; bubble(out,'错误','请求失败：'+e,false); }
-    btn.disabled=false;
+  row.appendChild(label);
+  row.appendChild(bubble);
+  el.appendChild(row);
+  if (scroll) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  return { bubble, row };
+}
+
+// ── Sidebar ──
+function renderSidebar() {
+  const list = document.getElementById('convList');
+  list.innerHTML = '';
+  for (let i = convs.length - 1; i >= 0; i--) {
+    const c = convs[i];
+    const item = document.createElement('div');
+    item.className = 'conv-item' + (c.id === curId ? ' active' : '');
+    item.textContent = c.title || '新对话';
+    item.title = c.title || '新对话';
+    item.onclick = () => loadConv(c.id);
+    list.appendChild(item);
   }
+}
 
-  async function ask(){
-    const q = document.getElementById('q'); const text=q.value.trim(); if(!text) return;
-    const out = document.getElementById('askOut');
-    const btn = document.getElementById('askBtn'); btn.disabled=true;
-    bubble(out,'你',text,true); q.value='';
-    const s = document.createElement('div'); s.className='spin'; s.textContent='思考中…'; out.appendChild(s);
+function loadConv(id) {
+  curId = id;
+  renderSidebar();
+  renderMessages(getConv(id));
+}
 
-    // POST (reliable UTF-8) + read the streamed SSE frames token-by-token.
-    let acc=''; let el=null;
-    const render = ()=>{
-      if(s.parentNode) s.remove();
-      if(!el) el = bubble(out,'助手','',false);
-      el.innerHTML = '<div class="who">助手<button class="copy" onclick="copyText(this)">复制</button></div>'+fmt(acc);
-      el.scrollIntoView({behavior:'smooth', block:'nearest'});
-    };
-    try{
-      const resp = await fetch(API+'/ask-stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:text})});
-      const reader = resp.body.getReader(); const dec = new TextDecoder('utf-8');
-      let buf='';
-      while(true){
-        const {value,done} = await reader.read(); if(done) break;
-        buf += dec.decode(value,{stream:true});
-        let i;
-        while((i=buf.indexOf('\n\n'))>=0){
-          const frame=buf.slice(0,i); buf=buf.slice(i+2);
-          let ev='message', data='';
-          for(const ln of frame.split('\n')){
-            if(ln.startsWith('event:')) ev=ln.slice(6).trim();
-            else if(ln.startsWith('data:')) data+=ln.slice(5);
-          }
-          if(ev!=='done' && data){ acc+=data; render(); }
+function newChat() {
+  const id = Date.now().toString();
+  convs.push({ id, title: '新对话', msgs: [] });
+  save();
+  loadConv(id);
+  setTimeout(() => document.getElementById('q').focus(), 50);
+}
+
+// ── Send ──
+async function send() {
+  const qa = document.getElementById('q');
+  const text = qa.value.trim();
+  if (!text) return;
+
+  if (!curId) newChat();
+  const conv = getConv(curId);
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+  qa.value = '';
+  qa.style.height = '';
+
+  conv.msgs.push({ role: 'user', text });
+  if (conv.title === '新对话') conv.title = text.length > 18 ? text.slice(0, 18) + '…' : text;
+  save();
+
+  appendRow('user', text, true);
+  renderSidebar();
+
+  const el = document.getElementById('messages');
+  const thinkRow = document.createElement('div');
+  thinkRow.className = 'thinking-row';
+  thinkRow.textContent = '思考中…';
+  el.appendChild(thinkRow);
+  thinkRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  let accText = '';
+  let bubbleEl = null;
+  let copyBtn = null;
+
+  const render = () => {
+    if (thinkRow.parentNode) thinkRow.remove();
+    if (!bubbleEl) {
+      const { bubble, row } = appendRow('assistant', '', true);
+      bubbleEl = bubble;
+      copyBtn = row.querySelector('.copy-btn');
+    }
+    bubbleEl.innerHTML = fmt(accText);
+    bubbleEl.closest('.msg-row').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  try {
+    const resp = await fetch(API + '/ask-stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: text })
+    });
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder('utf-8');
+    let buf = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) {
+        const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+        let ev = 'message', data = '';
+        for (const ln of frame.split('\n')) {
+          if (ln.startsWith('event:')) ev = ln.slice(6).trim();
+          else if (ln.startsWith('data:')) data += ln.slice(5);
         }
+        if (ev !== 'done' && data) { accText += data; render(); }
       }
-      if(!el) bubble(out,'助手',acc||'（无内容）',false);
-    }catch(e){ if(s.parentNode) s.remove(); bubble(out,'助手','请求失败：'+e,false); }
-    btn.disabled=false;
+    }
+    if (!bubbleEl) appendRow('assistant', accText || '（无内容）', true);
+    if (copyBtn) copyBtn.onclick = () => { navigator.clipboard.writeText(accText); copyBtn.textContent = '已复制'; setTimeout(() => copyBtn.textContent = '复制', 1300); };
+    conv.msgs.push({ role: 'assistant', text: accText });
+    save();
+  } catch (e) {
+    if (thinkRow.parentNode) thinkRow.remove();
+    const errText = '请求失败：' + e;
+    appendRow('assistant', errText, true);
+    conv.msgs.push({ role: 'assistant', text: errText });
+    save();
   }
-  document.getElementById('q').addEventListener('keydown',e=>{ if(e.ctrlKey && e.key==='Enter') ask(); });
+
+  btn.disabled = false;
+  qa.focus();
+}
+
+function fillSend(text) {
+  document.getElementById('q').value = text;
+  send();
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+}
+
+document.getElementById('q').addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); send(); }
+});
+
+// ── Init ──
+(function () {
+  if (convs.length === 0) {
+    newChat();
+  } else {
+    loadConv(convs[convs.length - 1].id);
+  }
+})();
 </script>
 </body>
 </html>
