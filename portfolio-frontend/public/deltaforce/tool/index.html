@@ -78,8 +78,8 @@
   </section>
 </div>
 
-<!-- 后端地址配置：Vercel 部署前在 config.js 里填 Railway 公网域名 -->
-<script src="config.js"></script>
+<!-- 后端地址内联（避免相对路径 config.js 在无结尾斜杠访问时 404 导致接口失效）-->
+<script>window.API_BASE = "https://deltaforcetools-production.up.railway.app";</script>
 <script>
   function show(t){
     document.getElementById('paneDaily').style.display = t==='daily'?'':'none';
