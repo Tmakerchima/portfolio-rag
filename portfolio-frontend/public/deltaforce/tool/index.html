@@ -262,14 +262,18 @@ async function send(){
     bubbleEl.closest('.msg-row').scrollIntoView({behavior:'smooth',block:'nearest'});
   };
   try{
+    console.log('[DF] fetch', API+'/ask-stream', 'q=', text);
     const resp=await fetch(API+'/ask-stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:text})});
+    console.log('[DF] resp status', resp.status, 'bodyNull=', resp.body===null);
     const reader=resp.body.getReader(),dec=new TextDecoder('utf-8');
-    let buf='';
+    let buf='',chunkCount=0;
     while(true){
-      const {value,done}=await reader.read(); if(done) break;
-      buf+=dec.decode(value,{stream:true});
+      const {value,done}=await reader.read(); if(done){console.log('[DF] stream done, chunks=',chunkCount,'accText.len=',accText.length);break;}
+      chunkCount++;
+      const chunk=dec.decode(value,{stream:true}); buf+=chunk;
+      console.log('[DF] chunk#'+chunkCount, JSON.stringify(chunk.slice(0,80)));
       const {frames,rest}=parseFrames(buf); buf=rest;
-      for(const frame of frames){const {ev,data}=parseFrame(frame);if(ev!=='done'&&data){accText+=data;render();}}
+      for(const frame of frames){const {ev,data}=parseFrame(frame);console.log('[DF] frame ev=',ev,'data.len=',data.length,'data=',JSON.stringify(data.slice(0,40)));if(ev!=='done'&&data){accText+=data;render();}}
     }
     if(!bubbleEl) appendRow('assistant',accText||'（无内容）',true);
     if(copyBtn) copyBtn.onclick=()=>{navigator.clipboard.writeText(accText);copyBtn.textContent='已复制';setTimeout(()=>copyBtn.textContent='复制',1300);};
