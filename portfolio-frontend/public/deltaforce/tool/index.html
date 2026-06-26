@@ -6,191 +6,158 @@
   <title>三角洲问答助手</title>
   <style>
     :root {
-      --bg:        #f5f3ee;
-      --sidebar:   #efece5;
-      --surface:   #ffffff;
-      --line:      #e2ddd6;
-      --fg:        #1a1915;
-      --fg2:       #6b6760;
-      --acc:       #c96442;
-      --acc-h:     #b5522f;
-      --user-bg:   #f0ede6;
-      --user-line: #d9d4cb;
-      --inp-bg:    #ffffff;
-      --inp-line:  #d4cfc8;
-      --inp-focus: #c96442;
-      --send-bg:   #c96442;
-      --send-h:    #b5522f;
+      --bg:        #F0EEE6;
+      --sidebar:   #E8E5DC;
+      --surface:   #FEFCF8;
+      --line:      #DDD9D0;
+      --line2:     #C9C4BA;
+      --fg:        #1A1915;
+      --fg2:       #6B6760;
+      --acc:       #C96442;
+      --acc-h:     #B5522F;
+      --user-bg:   #E8E1D4;
+      --user-line: #CFC8BA;
+      --serif:     Georgia, "Times New Roman", "Songti SC", "STSong", serif;
+      --sans:      -apple-system, "Segoe UI", "Helvetica Neue", "Microsoft YaHei", sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
     body {
-      background: var(--bg);
-      color: var(--fg);
-      font: 15px/1.7 -apple-system, "Segoe UI", "Helvetica Neue", "Microsoft YaHei", sans-serif;
-      display: flex;
-      overflow: hidden;
+      background: var(--bg); color: var(--fg);
+      font: 15px/1.72 var(--sans);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      display: flex; overflow: hidden;
     }
-
     .sidebar {
-      width: 240px; min-width: 240px;
-      background: var(--sidebar);
-      border-right: 1px solid var(--line);
+      width: 236px; min-width: 236px;
+      background: var(--sidebar); border-right: 1px solid var(--line);
       display: flex; flex-direction: column; overflow: hidden;
     }
     .sidebar-top { padding: 14px 12px; border-bottom: 1px solid var(--line); }
     .new-btn {
       width: 100%; background: var(--acc); color: #fff; border: none;
-      border-radius: 9px; padding: 9px 14px;
-      font: 14px/1 inherit; font-weight: 500;
-      cursor: pointer; display: flex; align-items: center; gap: 8px;
+      border-radius: 10px; padding: 10px 14px;
+      font: 500 14px/1 var(--sans); cursor: pointer;
+      display: flex; align-items: center; gap: 8px; letter-spacing: .01em;
       transition: background .15s;
     }
     .new-btn:hover { background: var(--acc-h); }
     .conv-list { flex: 1; overflow-y: auto; padding: 6px 8px; }
     .conv-list::-webkit-scrollbar { width: 4px; }
-    .conv-list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+    .conv-list::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 2px; }
     .conv-group-label {
-      font-size: 11px; font-weight: 600; letter-spacing: .04em;
-      color: var(--fg2); text-transform: uppercase; padding: 10px 8px 4px;
+      font: 600 10.5px/1 var(--sans); letter-spacing: .06em; text-transform: uppercase;
+      color: var(--fg2); padding: 12px 8px 4px;
     }
     .conv-item {
       padding: 7px 10px; border-radius: 8px; cursor: pointer;
       font-size: 13px; color: var(--fg2);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       margin-bottom: 1px; user-select: none;
-      transition: background .1s, color .1s;
+      transition: background .12s, color .12s;
     }
     .conv-item:hover  { background: var(--line); color: var(--fg); }
-    .conv-item.active { background: var(--surface); color: var(--fg); font-weight: 500; }
-    .sidebar-footer { padding: 12px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--fg2); }
+    .conv-item.active { background: var(--surface); color: var(--fg); font-weight: 500; box-shadow: 0 1px 3px rgba(0,0,0,.07); }
+    .sidebar-footer { padding: 12px 14px; border-top: 1px solid var(--line); font: italic 12px/1.5 var(--serif); color: var(--fg2); }
 
     .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-
-    .messages {
-      flex: 1; overflow-y: auto; padding: 24px 0 8px;
-      display: flex; flex-direction: column;
-    }
+    .messages { flex: 1; overflow-y: auto; padding: 28px 0 10px; display: flex; flex-direction: column; }
     .messages::-webkit-scrollbar { width: 5px; }
-    .messages::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+    .messages::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 3px; }
 
     .empty-state {
       flex: 1; display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      gap: 12px; color: var(--fg2); padding: 40px 24px; text-align: center;
+      gap: 14px; padding: 40px 24px; text-align: center;
     }
-    .empty-logo {
-      width: 48px; height: 48px; background: var(--acc); border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: 22px;
-    }
-    .empty-title { font-size: 22px; font-weight: 600; color: var(--fg); margin-top: 4px; }
-    .empty-sub   { font-size: 14px; color: var(--fg2); }
-    .suggestions { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 500px; margin-top: 8px; }
+    .empty-mark { font: 500 28px/1 var(--serif); color: var(--acc); letter-spacing: -.02em; }
+    .empty-title { font: 500 26px/1.15 var(--serif); color: var(--fg); letter-spacing: -.02em; }
+    .empty-sub { font-size: 14px; color: var(--fg2); }
+    .suggestions { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 520px; margin-top: 6px; }
     .suggestion {
-      background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-      padding: 11px 16px; font: 13px/1.5 inherit; cursor: pointer; color: var(--fg);
-      text-align: left; transition: border-color .15s, box-shadow .15s;
-    }
-    .suggestion:hover { border-color: var(--acc); box-shadow: 0 1px 6px rgba(201,100,66,.12); }
-
-    .msg-row {
-      padding: 4px 28px; max-width: 860px; width: 100%; margin: 0 auto;
-      display: flex; flex-direction: column;
-    }
-    .msg-meta {
-      font-size: 11px; font-weight: 600; letter-spacing: .03em;
-      text-transform: uppercase; color: var(--fg2);
-      margin-bottom: 4px; display: flex; align-items: center; gap: 8px;
-    }
-    .msg-row.user .msg-meta { color: var(--acc); }
-
-    .bubble {
-      display: inline-block; max-width: 84%;
-      padding: 11px 16px; border-radius: 12px;
-      word-break: break-word; line-height: 1.7; font-size: 14.5px;
-    }
-    .msg-row.user .bubble {
-      background: var(--user-bg); border: 1px solid var(--user-line); white-space: pre-wrap;
-    }
-    .msg-row.assistant .bubble {
-      background: var(--surface); border: 1px solid var(--line);
-      white-space: pre-wrap; box-shadow: 0 1px 3px rgba(0,0,0,.05);
-    }
-    .bubble b { color: var(--acc); font-weight: 600; }
-    .bubble a { color: var(--acc); word-break: break-all; }
-    .bubble .shot { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; display: block; }
-
-    .copy-btn {
-      background: none; border: 1px solid var(--line); color: var(--fg2);
-      border-radius: 5px; font-size: 11px; padding: 2px 8px; cursor: pointer;
-      margin-left: 6px; transition: border-color .15s, color .15s;
-    }
-    .copy-btn:hover { border-color: var(--acc); color: var(--acc); }
-
-    .thinking-row {
-      padding: 6px 28px; max-width: 860px; margin: 0 auto; width: 100%;
-      color: var(--fg2); font-size: 13px; font-style: italic;
-    }
-
-    .input-wrap { padding: 10px 28px 22px; max-width: 860px; width: 100%; margin: 0 auto; }
-    .input-box {
-      display: flex; gap: 8px; align-items: flex-end;
-      background: var(--inp-bg); border: 1.5px solid var(--inp-line);
-      border-radius: 14px; padding: 10px 10px 10px 16px;
-      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 18px; font: 13.5px/1.5 var(--sans); cursor: pointer; color: var(--fg);
+      text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,.04);
       transition: border-color .15s, box-shadow .15s;
     }
-    .input-box:focus-within {
-      border-color: var(--inp-focus);
-      box-shadow: 0 0 0 3px rgba(201,100,66,.12), 0 1px 4px rgba(0,0,0,.06);
+    .suggestion:hover { border-color: var(--acc); box-shadow: 0 2px 8px rgba(201,100,66,.13); }
+
+    .msg-row { padding: 6px 32px; max-width: 880px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; }
+    .msg-meta {
+      font: italic 600 10.5px/1 var(--serif); letter-spacing: .06em; text-transform: uppercase;
+      color: var(--fg2); margin-bottom: 5px; display: flex; align-items: center; gap: 8px;
     }
-    .input-box textarea {
-      flex: 1; background: none; border: none; outline: none;
-      color: var(--fg); font: 15px/1.6 inherit; resize: none;
-      max-height: 200px; padding: 2px 0;
+    .msg-row.user .msg-meta { color: var(--acc); }
+    .bubble {
+      display: inline-block; max-width: 85%;
+      padding: 12px 18px; border-radius: 14px;
+      word-break: break-word; line-height: 1.75; font-size: 14.5px;
     }
+    .msg-row.user .bubble { background: var(--user-bg); border: 1px solid var(--user-line); white-space: pre-wrap; }
+    .msg-row.assistant .bubble {
+      background: var(--surface); border: 1px solid var(--line); white-space: pre-wrap;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.7);
+    }
+    .bubble b { color: var(--acc); font-weight: 600; }
+    .bubble a { color: var(--acc); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+    .bubble .shot { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; display: block; }
+    .copy-btn {
+      background: none; border: 1px solid var(--line); color: var(--fg2);
+      border-radius: 6px; font: 11px/1 var(--sans); padding: 3px 9px; cursor: pointer; margin-left: 6px;
+      transition: border-color .15s, color .15s;
+    }
+    .copy-btn:hover { border-color: var(--acc); color: var(--acc); }
+    .thinking-row { padding: 6px 32px; max-width: 880px; margin: 0 auto; width: 100%; font: italic 13px/1 var(--serif); color: var(--fg2); }
+
+    .input-wrap { padding: 10px 32px 24px; max-width: 880px; width: 100%; margin: 0 auto; }
+    .input-box {
+      display: flex; gap: 8px; align-items: flex-end;
+      background: var(--surface); border: 1.5px solid var(--line2);
+      border-radius: 16px; padding: 10px 10px 10px 18px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.8);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .input-box:focus-within { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(201,100,66,.13), 0 1px 4px rgba(0,0,0,.06); }
+    .input-box textarea { flex: 1; background: none; border: none; outline: none; color: var(--fg); font: 15px/1.65 var(--sans); resize: none; max-height: 200px; padding: 2px 0; }
     .input-box textarea::placeholder { color: var(--fg2); }
     .send-btn {
-      background: var(--send-bg); color: #fff; border: none; border-radius: 9px;
+      background: var(--acc); color: #fff; border: none; border-radius: 10px;
       width: 38px; height: 38px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       transition: background .15s;
     }
-    .send-btn:hover:not(:disabled) { background: var(--send-h); }
+    .send-btn:hover:not(:disabled) { background: var(--acc-h); }
     .send-btn:disabled { opacity: .35; cursor: not-allowed; }
-    .send-btn svg { width: 16px; height: 16px; fill: #fff; }
-    .input-hint { font-size: 11.5px; color: var(--fg2); margin-top: 7px; text-align: center; }
+    .send-btn svg { width: 15px; height: 15px; fill: #fff; }
+    .input-hint { font: 11.5px/1.5 var(--sans); color: var(--fg2); margin-top: 8px; text-align: center; }
 
     @media (max-width: 640px) {
       .sidebar { display: none; }
       .msg-row, .thinking-row { padding: 4px 14px; }
       .input-wrap { padding: 10px 14px 18px; }
-      .bubble { max-width: 96%; font-size: 14px; }
+      .bubble { max-width: 97%; font-size: 14px; }
     }
   </style>
 </head>
 <body>
-
 <aside class="sidebar">
   <div class="sidebar-top">
     <button class="new-btn" onclick="newChat()">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
-        <line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/>
-      </svg>
-      新建对话
+      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+        <line x1="7" y1="1" x2="7" y2="13"/><line x1="1" y1="7" x2="13" y2="7"/>
+      </svg>新建对话
     </button>
   </div>
   <div class="conv-list" id="convList"></div>
   <div class="sidebar-footer">三角洲问答助手</div>
 </aside>
-
 <div class="main">
   <div class="messages" id="messages"></div>
   <div class="input-wrap">
     <div class="input-box">
       <textarea id="q" rows="1" placeholder="问我关于三角洲的任何问题…" oninput="autoResize(this)"></textarea>
-      <button class="send-btn" id="sendBtn" onclick="send()" title="发送 (Ctrl+Enter)">
+      <button class="send-btn" id="sendBtn" onclick="send()" title="Ctrl+Enter 发送">
         <svg viewBox="0 0 16 16"><path d="M14.5 8L1.5 1.5l3 6.5-3 6.5z"/></svg>
       </button>
     </div>
@@ -200,27 +167,21 @@
 
 <script src="config.js"></script>
 <script>
-const API = ((window.API_BASE || location.origin).replace(/\/+$/, '')) + '/api';
-
-let convs = JSON.parse(localStorage.getItem('df_convs') || '[]');
-let curId = null;
-function save() { localStorage.setItem('df_convs', JSON.stringify(convs)); }
-function getConv(id) { return convs.find(c => c.id === id); }
-
-function fmt(s) {
-  let e = (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  e = e.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
-  e = e.replace(/https?:\/\/[^\s）)]+\.(?:png|jpg|jpeg|webp|gif)/gi,
-      u=>'<br><img class="shot" src="'+u+'" loading="lazy"><br>');
-  e = e.replace(/(https?:\/\/[^\s<）)]+)(?![^<]*>)/g,
-      u=>'<a href="'+u+'" target="_blank">'+u+'</a>');
+const API = ((window.API_BASE||location.origin).replace(/\/+$/,''))+'/api';
+let convs=JSON.parse(localStorage.getItem('df_convs')||'[]'), curId=null;
+function save(){localStorage.setItem('df_convs',JSON.stringify(convs));}
+function getConv(id){return convs.find(c=>c.id===id);}
+function fmt(s){
+  let e=(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  e=e.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  e=e.replace(/https?:\/\/[^\s）)]+\.(?:png|jpg|jpeg|webp|gif)/gi,u=>'<br><img class="shot" src="'+u+'" loading="lazy"><br>');
+  e=e.replace(/(https?:\/\/[^\s<）)]+)(?![^<]*>)/g,u=>'<a href="'+u+'" target="_blank">'+u+'</a>');
   return e;
 }
-
-function showEmpty() {
-  document.getElementById('messages').innerHTML = `
+function showEmpty(){
+  document.getElementById('messages').innerHTML=`
     <div class="empty-state">
-      <div class="empty-logo">⚔</div>
+      <div class="empty-mark">△</div>
       <div class="empty-title">三角洲问答助手</div>
       <div class="empty-sub">实时行情 · 配装建议 · 改枪码</div>
       <div class="suggestions">
@@ -231,130 +192,99 @@ function showEmpty() {
       </div>
     </div>`;
 }
-
-function renderMessages(conv) {
-  const el = document.getElementById('messages');
-  el.innerHTML = '';
-  if (!conv || conv.msgs.length === 0) { showEmpty(); return; }
-  for (const m of conv.msgs) appendRow(m.role, m.text, false);
-  el.scrollTop = el.scrollHeight;
+function renderMessages(conv){
+  const el=document.getElementById('messages'); el.innerHTML='';
+  if(!conv||conv.msgs.length===0){showEmpty();return;}
+  for(const m of conv.msgs) appendRow(m.role,m.text,false);
+  el.scrollTop=el.scrollHeight;
 }
-
-function appendRow(role, text, scroll) {
-  const el = document.getElementById('messages');
-  const es = el.querySelector('.empty-state');
-  if (es) es.remove();
-  const row = document.createElement('div');
-  row.className = 'msg-row ' + role;
-  const meta = document.createElement('div');
-  meta.className = 'msg-meta';
-  meta.textContent = role === 'user' ? '你' : '助手';
-  if (role === 'assistant') {
-    const cp = document.createElement('button');
-    cp.className = 'copy-btn'; cp.textContent = '复制';
-    cp.onclick = () => { navigator.clipboard.writeText(text); cp.textContent='已复制'; setTimeout(()=>cp.textContent='复制',1300); };
+function appendRow(role,text,scroll){
+  const el=document.getElementById('messages');
+  const es=el.querySelector('.empty-state'); if(es) es.remove();
+  const row=document.createElement('div'); row.className='msg-row '+role;
+  const meta=document.createElement('div'); meta.className='msg-meta';
+  meta.textContent=role==='user'?'你':'助手';
+  if(role==='assistant'){
+    const cp=document.createElement('button'); cp.className='copy-btn'; cp.textContent='复制';
+    cp.onclick=()=>{navigator.clipboard.writeText(text);cp.textContent='已复制';setTimeout(()=>cp.textContent='复制',1300);};
     meta.appendChild(cp);
   }
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  bubble.innerHTML = fmt(text);
-  row.appendChild(meta); row.appendChild(bubble);
-  el.appendChild(row);
-  if (scroll) row.scrollIntoView({behavior:'smooth',block:'nearest'});
-  return { bubble, row, meta };
+  const bubble=document.createElement('div'); bubble.className='bubble'; bubble.innerHTML=fmt(text);
+  row.appendChild(meta); row.appendChild(bubble); el.appendChild(row);
+  if(scroll) row.scrollIntoView({behavior:'smooth',block:'nearest'});
+  return {bubble,row,meta};
 }
-
-function renderSidebar() {
-  const list = document.getElementById('convList');
-  list.innerHTML = '';
-  if (convs.length === 0) return;
-  const lbl = document.createElement('div');
-  lbl.className = 'conv-group-label'; lbl.textContent = '历史对话';
+function renderSidebar(){
+  const list=document.getElementById('convList'); list.innerHTML='';
+  if(convs.length===0) return;
+  const lbl=document.createElement('div'); lbl.className='conv-group-label'; lbl.textContent='历史对话';
   list.appendChild(lbl);
-  for (let i = convs.length - 1; i >= 0; i--) {
-    const c = convs[i];
-    const item = document.createElement('div');
-    item.className = 'conv-item' + (c.id === curId ? ' active' : '');
-    item.textContent = c.title || '新对话';
-    item.title = c.title || '新对话';
-    item.onclick = () => loadConv(c.id);
-    list.appendChild(item);
+  for(let i=convs.length-1;i>=0;i--){
+    const c=convs[i], item=document.createElement('div');
+    item.className='conv-item'+(c.id===curId?' active':'');
+    item.textContent=c.title||'新对话'; item.title=c.title||'新对话';
+    item.onclick=()=>loadConv(c.id); list.appendChild(item);
   }
 }
-
-function loadConv(id) { curId = id; renderSidebar(); renderMessages(getConv(id)); }
-function newChat() {
-  const id = Date.now().toString();
-  convs.push({id, title:'新对话', msgs:[]});
-  save(); loadConv(id);
-  setTimeout(()=>document.getElementById('q').focus(), 50);
+function loadConv(id){curId=id;renderSidebar();renderMessages(getConv(id));}
+function newChat(){
+  const id=Date.now().toString(); convs.push({id,title:'新对话',msgs:[]});
+  save();loadConv(id);setTimeout(()=>document.getElementById('q').focus(),50);
 }
-
-async function send() {
-  const qa = document.getElementById('q');
-  const text = qa.value.trim(); if (!text) return;
-  if (!curId) newChat();
-  const conv = getConv(curId);
-  const btn = document.getElementById('sendBtn');
-  btn.disabled = true; qa.value = ''; qa.style.height = '';
-  conv.msgs.push({role:'user', text});
-  if (conv.title === '新对话') conv.title = text.length > 20 ? text.slice(0,20)+'…' : text;
-  save(); appendRow('user', text, true); renderSidebar();
-
-  const el = document.getElementById('messages');
-  const thinkRow = document.createElement('div');
-  thinkRow.className = 'thinking-row'; thinkRow.textContent = '思考中…';
-  el.appendChild(thinkRow);
-  thinkRow.scrollIntoView({behavior:'smooth',block:'nearest'});
-
-  let accText='', bubbleEl=null, copyBtn=null;
-  const render = () => {
-    if (thinkRow.parentNode) thinkRow.remove();
-    if (!bubbleEl) {
-      const {bubble, meta} = appendRow('assistant', '', true);
-      bubbleEl = bubble; copyBtn = meta.querySelector('.copy-btn');
-    }
-    bubbleEl.innerHTML = fmt(accText);
+function parseFrames(buf){
+  const frames=[];let i;
+  while((i=buf.indexOf('\n\n'))>=0){frames.push(buf.slice(0,i));buf=buf.slice(i+2);}
+  return {frames,rest:buf};
+}
+function parseFrame(frame){
+  let ev='message',data='';
+  for(const ln of frame.split('\n')){
+    if(ln.startsWith('event:')) ev=ln.slice(6).trim();
+    else if(ln.startsWith('data:')){if(data)data+='\n';data+=ln.slice(5);}
+  }
+  return {ev,data};
+}
+async function send(){
+  const qa=document.getElementById('q'); const text=qa.value.trim(); if(!text) return;
+  if(!curId) newChat(); const conv=getConv(curId);
+  const btn=document.getElementById('sendBtn'); btn.disabled=true; qa.value=''; qa.style.height='';
+  conv.msgs.push({role:'user',text});
+  if(conv.title==='新对话') conv.title=text.length>20?text.slice(0,20)+'…':text;
+  save(); appendRow('user',text,true); renderSidebar();
+  const el=document.getElementById('messages');
+  const thinkRow=document.createElement('div'); thinkRow.className='thinking-row'; thinkRow.textContent='思考中…';
+  el.appendChild(thinkRow); thinkRow.scrollIntoView({behavior:'smooth',block:'nearest'});
+  let accText='',bubbleEl=null,copyBtn=null;
+  const render=()=>{
+    if(thinkRow.parentNode) thinkRow.remove();
+    if(!bubbleEl){const {bubble,meta}=appendRow('assistant','',true);bubbleEl=bubble;copyBtn=meta.querySelector('.copy-btn');}
+    bubbleEl.innerHTML=fmt(accText);
     bubbleEl.closest('.msg-row').scrollIntoView({behavior:'smooth',block:'nearest'});
   };
-
-  try {
-    const resp = await fetch(API+'/ask-stream', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({question:text})
-    });
-    const reader = resp.body.getReader(), dec = new TextDecoder('utf-8');
-    let buf = '';
-    while (true) {
-      const {value, done} = await reader.read(); if (done) break;
-      buf += dec.decode(value, {stream:true});
-      let i;
-      while ((i = buf.indexOf('\n\n')) >= 0) {
-        const frame = buf.slice(0,i); buf = buf.slice(i+2);
-        let ev='message', data='';
-        for (const ln of frame.split('\n')) {
-          if (ln.startsWith('event:')) ev=ln.slice(6).trim();
-          else if (ln.startsWith('data:')) data+=ln.slice(5);
-        }
-        if (ev!=='done' && data) { accText+=data; render(); }
-      }
+  try{
+    const resp=await fetch(API+'/ask-stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:text})});
+    const reader=resp.body.getReader(),dec=new TextDecoder('utf-8');
+    let buf='';
+    while(true){
+      const {value,done}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const {frames,rest}=parseFrames(buf); buf=rest;
+      for(const frame of frames){const {ev,data}=parseFrame(frame);if(ev!=='done'&&data){accText+=data;render();}}
     }
-    if (!bubbleEl) appendRow('assistant', accText||'（无内容）', true);
-    if (copyBtn) copyBtn.onclick = ()=>{ navigator.clipboard.writeText(accText); copyBtn.textContent='已复制'; setTimeout(()=>copyBtn.textContent='复制',1300); };
-    conv.msgs.push({role:'assistant', text:accText}); save();
-  } catch(e) {
-    if (thinkRow.parentNode) thinkRow.remove();
-    const errText='请求失败：'+e;
-    appendRow('assistant', errText, true);
-    conv.msgs.push({role:'assistant', text:errText}); save();
+    if(!bubbleEl) appendRow('assistant',accText||'（无内容）',true);
+    if(copyBtn) copyBtn.onclick=()=>{navigator.clipboard.writeText(accText);copyBtn.textContent='已复制';setTimeout(()=>copyBtn.textContent='复制',1300);};
+    conv.msgs.push({role:'assistant',text:accText});save();
+  }catch(e){
+    if(thinkRow.parentNode) thinkRow.remove();
+    const errText='请求失败：'+e; appendRow('assistant',errText,true);
+    conv.msgs.push({role:'assistant',text:errText});save();
   }
-  btn.disabled = false; qa.focus();
+  btn.disabled=false; qa.focus();
 }
-
-function fillSend(text) { document.getElementById('q').value = text; send(); }
-function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,200)+'px'; }
-document.getElementById('q').addEventListener('keydown', e=>{ if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();send();} });
-(function(){ if(convs.length===0) newChat(); else loadConv(convs[convs.length-1].id); })();
+function fillSend(text){document.getElementById('q').value=text;send();}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,200)+'px';}
+document.getElementById('q').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();send();}});
+(function(){if(convs.length===0)newChat();else loadConv(convs[convs.length-1].id);})();
 </script>
 </body>
 </html>
