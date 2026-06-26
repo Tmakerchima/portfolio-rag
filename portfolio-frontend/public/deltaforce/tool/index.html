@@ -165,7 +165,7 @@
   </div>
 </div>
 
-<script src="config.js"></script>
+<script>window.API_BASE="https://deltaforcetools-production.up.railway.app";</script>
 <script>
 const API = ((window.API_BASE||location.origin).replace(/\/+$/,''))+'/api';
 let convs=JSON.parse(localStorage.getItem('df_convs')||'[]'), curId=null;
