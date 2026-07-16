@@ -10,7 +10,7 @@
 - 邮箱：709851837@qq.com
 - 个人博客：https://tmakerchima.github.io
 - GitHub：https://github.com/tmakerchima
-- 求职意向：软件开发 / AIGC
+- 求职意向：Java 后端工程师 / AI Agent 工程师
 
 ---
 
@@ -40,7 +40,7 @@
 
 ### 第一阶段：杭州云融有限公司 — Java 后端工程师（2021-11 ~ 2023-06）
 
-毕业后的第一份工作，马驰加入了杭州云融有限公司，投身金融科技领域。在这里，他参与了**宁波银行额度中心项目**的核心开发，亲历了一个银行级系统从开发到上线的完整过程。这段经历让他深刻理解了金融系统对稳定性、合规性的极高要求，也奠定了他对银行业技术的浓厚兴趣。
+毕业后的第一份工作，马驰加入了杭州云融有限公司，投身金融科技领域。在这里，他参与了**宁波银行额度中心项目**的核心开发，亲历了一个银行级系统从开发到上线的完整过程。这段经历让他深刻理解了企业级系统对稳定性、合规性和可维护性的要求。
 
 同期还参与了小微项目的开发，系统成功上线并稳定运行，积累了扎实的 Java 后端工程实践。
 
@@ -60,16 +60,11 @@
 
 ---
 
-## 为什么选择银行 / 金融科技方向
+## 当前职业定位
 
-马驰的职业路径天然地与金融紧密交织：
+马驰的定位是 **Java 后端工程师 / AI Agent 工程师**。Java 与 Spring Boot 仍是他的工程基本盘：他有银行级系统交付、WMS 对接、云平台接口开发和大规模数据迁移经验，理解稳定性、数据一致性、接口设计、测试和 CI/CD。
 
-1. **起点即金融**：第一份工作就是帮助宁波银行建设额度系统，深度参与银行核心业务系统的开发与上线，积累了对金融系统严格标准的真实理解
-2. **巅峰在金融**：在美国道富——全球顶级金融机构——任职近两年，参与企业级数据工程，英文工作环境，国际化团队协作
-3. **技术与业务的契合**：金融系统对稳定性、安全性、合规性的极高要求，与马驰扎实的 Java 工程能力高度契合
-4. **看好 AIGC 在金融的未来**：当前正在探索 Spring AI + RAG 等技术，希望将 AI 能力落地到金融风控、智能客服等场景
-
-马驰对宁波、杭州、上海的银行和外资企业感兴趣，不仅因为地理便利，更因为这些城市的金融机构在技术创新上走在前列。
+在此基础上，他正在将能力延伸到 AI Agent 工程：不只调用模型 API，而是围绕真实任务设计 **RAG 检索、Tool Calling、MCP 工具接入、流式响应、提示词约束、数据持久化和可观测交互**。本作品集本身就是一套已上线的 Spring AI 应用；近期还完成了 TrendCopy AI 和 FundLens 两个面向真实使用场景的 AI 产品。
 
 ---
 
@@ -111,6 +106,30 @@
 
 技术栈：Azure、Databricks、Harness CI/CD、Azure Blob Storage、Java
 
+### 7. Portfolio RAG 简历 AI Agent（2026，个人，已上线并开源）
+
+设计并开发当前个人网站的智能问答系统。前端使用 Vue 3 + TypeScript，通过 SSE 展示流式回答；后端使用 **Java 21、Spring Boot、Spring AI 和 WebFlux** 编排多种能力：从 Supabase PGVector 检索简历片段，通过 Function Calling 查询博客动态，并通过 GitHub 官方远程 MCP Server 查询仓库、Issue 与 PR 等实时信息。系统会在前端标记每轮回答实际使用了 RAG、Function Calling 还是 MCP，GitHub MCP 不可用时会容错降级，避免拖垮主问答链路。
+
+部署链路为：前端 Vercel（https://tmakerchima.cn）、后端 Railway、向量数据库 Supabase PostgreSQL + pgvector。代码地址：https://github.com/Tmakerchima/portfolio-rag
+
+技术栈：Java 21、Spring Boot、Spring AI、WebFlux、RAG、PGVector、Function Calling、MCP、Vue 3、TypeScript、Vercel、Railway、Supabase
+
+### 8. TrendCopy AI 多平台内容 Agent（2026，个人，已上线并开源）
+
+将公开的 AI / 产品趋势转化为小红书、X/Twitter 和 Newsletter 的可发布内容，形成“趋势采集、信息整理、LLM 生成、多平台适配”的内容工作流。后端采用 **Java + Spring Boot**，接入 Qwen 与 Firecrawl；使用 Supabase 持久化用户、订阅和用量数据，并实现邮箱登录、Google OAuth 与支付链路。前端部署在 Vercel，后端部署在 Railway。
+
+网站：https://trendcopy.asia；代码：https://github.com/Tmakerchima/trendcopyAI
+
+技术栈：Java、Spring Boot、Qwen、Firecrawl、Supabase PostgreSQL、Vercel、Railway
+
+### 9. FundLens AI 趋势研究助手（2026，个人，已上线并开源）
+
+覆盖中国场外基金、A 股和美股的趋势研究。项目将趋势、动量、均值回归、风险区间和走步式样本外验证组合为可解释的量化研究流程，并使用 Qwen 审查用户提供的财报、公告、季报或新闻原文，输出事实、风险、催化因素以及它与量化信号是否冲突。模型输出与回测值保持只读，页面明确展示数据与方法限制，不把预测包装成收益保证。
+
+代码：https://github.com/Tmakerchima/fundPrediction
+
+技术栈：JavaScript、Qwen、量化研究、样本外回测、风险建模、Vercel、Railway
+
 ---
 
 ## 技术栈与能力
@@ -123,9 +142,10 @@
 | Databricks | 80% | Delta Lake、Pipeline、Auto Loader 实战 |
 | Azure | 80% | Blob Storage、鉴权配置实战 |
 | 算法 | 80% | NSGA-II遗传算法、模拟退火、KNN、ItemCF、LCS |
-| AI/AIGC | 80% | Spring AI、RAG、LLM 应用开发 |
+| AI Agent / LLM 应用 | 熟练 | Spring AI、RAG、Function Calling、MCP、流式交互、工具编排 |
 | Python | 一般 | 推荐算法、数据处理 |
 | MySQL / MyBatis-Plus | 熟练 | 多项目实战 |
+| PostgreSQL / PGVector | 熟练 | Supabase 托管数据库、向量检索、业务数据持久化 |
 | CI/CD (Harness) | 熟练 | 美国道富实战经验 |
 
 ---
@@ -147,10 +167,6 @@
 
 ---
 
-## 求职动机总结
+## 职业目标
 
-马驰希望加入宁波/杭州/上海的银行或外资企业 Java 中级岗位，原因如下：
-1. 有完整的银行系统从0到1的交付经验（宁波银行额度系统）
-2. 有国际大型金融机构（美国道富）的研发经历，理解金融科技的工程标准
-3. 技术栈（Java/Spring Boot/大数据）与银行 IT 岗位高度契合
-4. 对 AIGC 在金融领域的落地应用有浓厚兴趣和实践探索（本网站本身即是一个 RAG 作品集项目）
+马驰希望继续从事 Java 后端或 AI Agent 工程岗位。适合他的工作应当同时重视工程质量与业务落地：一方面可以发挥 Java、Spring Boot、数据工程和企业级系统经验；另一方面能够继续建设具备检索、工具调用、任务编排与可靠数据链路的 LLM 应用。

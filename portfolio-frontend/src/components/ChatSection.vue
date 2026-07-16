@@ -25,9 +25,9 @@ const sources = ref<Source[]>([])
 const toolsUsed = ref<ToolUsage[]>([])
 
 const presets = [
-  '四年 Java 经验里最自豪的项目?',
-  '为什么想去银行做开发?',
-  '熟悉哪些分布式技术?',
+  '四年 Java 经验里最自豪的项目？',
+  '这个 AI Agent 作品集是怎么实现的？',
+  '最近做了哪些 AI 项目？',
 ]
 
 async function ask(q?: string) {
@@ -104,9 +104,12 @@ async function ask(q?: string) {
     <div class="max-w-[720px] mx-auto">
 
       <!-- 标题 -->
-      <h2 class="text-[48px] font-bold text-[#111111] dark:text-[#f5f5f5] mb-12">
+      <h2 class="text-[42px] md:text-[48px] font-bold text-[#111111] dark:text-[#f5f5f5] mb-4">
         Ask anything
       </h2>
+      <p class="mb-10 text-sm leading-relaxed text-[#777777] dark:text-[#999999]">
+        这是一个可调用 RAG、Function Calling 与 GitHub MCP 的简历 AI Agent。
+      </p>
 
       <!-- 预设问题胶囊 -->
       <div class="flex flex-wrap gap-3 mb-8">
@@ -125,7 +128,7 @@ async function ask(q?: string) {
       </div>
 
       <!-- 输入框 -->
-      <div class="flex gap-3">
+      <div class="flex flex-col sm:flex-row gap-3">
         <input
           v-model="question"
           @keydown.enter="ask()"
