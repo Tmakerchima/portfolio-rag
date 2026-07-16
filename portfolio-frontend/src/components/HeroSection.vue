@@ -3,19 +3,30 @@ defineEmits<{ 'scroll-to-chat': [] }>()
 </script>
 
 <template>
-  <section class="min-h-screen flex flex-col justify-center py-24">
-    <h1 class="text-[72px] font-bold leading-tight tracking-tight text-[#111111] dark:text-[#f5f5f5]">
+  <section class="min-h-screen flex flex-col justify-center py-20 md:py-24">
+    <div class="mb-8 flex flex-wrap gap-2" aria-label="Core skills">
+      <span class="border border-[#dbe7f2] bg-[#f4f8fc] px-3 py-1 text-xs font-bold tracking-wide text-[#0C447C]
+                   dark:border-[#26384b] dark:bg-[#101923] dark:text-[#78b7f5]">
+        JAVA / SPRING BOOT
+      </span>
+      <span class="border border-[#dbe7f2] bg-[#f4f8fc] px-3 py-1 text-xs font-bold tracking-wide text-[#0C447C]
+                   dark:border-[#26384b] dark:bg-[#101923] dark:text-[#78b7f5]">
+        AI AGENT / RAG / MCP
+      </span>
+    </div>
+
+    <h1 class="text-[44px] md:text-[72px] font-bold leading-tight tracking-tight text-[#111111] dark:text-[#f5f5f5]">
       马驰 <span class="text-[#0C447C] dark:text-[#5499E0]">/</span> Mac Ma
     </h1>
 
-    <p class="text-2xl text-[#666666] dark:text-[#999999] mt-4 font-normal">
-      Java Backend Engineer · 4 Years · Ningbo
+    <p class="text-xl md:text-2xl text-[#666666] dark:text-[#999999] mt-4 font-normal">
+      Java Backend Engineer <span class="text-[#0C447C] dark:text-[#5499E0]">×</span> AI Agent Engineer
     </p>
 
     <p class="text-lg text-[#444444] dark:text-[#bbbbbb] mt-8 max-w-[720px] leading-relaxed">
-      毕业于浙江工业大学软件工程专业，先后在杭州云融、乐歌人体工学及美国道富担任后端开发工程师。
-      熟悉 Spring Boot / Java 后端开发，有银行金融系统、WMS 仓储系统及大规模数据迁移（Hadoop → Databricks）实战经验。
-      对 AIGC 和大模型应用落地有浓厚兴趣，正在探索 AI 与金融科技的结合。
+      4 年企业级开发经验，主线是 Java / Spring Boot 后端工程，也在把 LLM 变成真正可用的产品能力。
+      做过银行核心业务系统、WMS 与 Hadoop → Databricks 数据迁移，也独立落地了基于 Spring AI 的
+      RAG、Tool Calling、MCP 与流式交互应用。
     </p>
 
     <div class="mt-12">
