@@ -39,7 +39,19 @@ const projects: Project[] = [
     detail: '将趋势、动量、均值回归、风险区间和走步式样本外验证组合为可解释的研究流程，并用 Qwen 审查用户提供的财报、公告与新闻证据，明确区分量化信号与事实材料。项目同时处理真实费率、持仓状态和风险提示，避免把模型输出包装成收益保证。',
     featured: true,
     links: [
+      { label: 'Live site', href: 'https://fundprediction.vercel.app/' },
       { label: 'GitHub', href: 'https://github.com/Tmakerchima/fundPrediction' },
+    ],
+  },
+  {
+    name: 'Local Build Agent · 本地编码 Agent',
+    period: '2026 · 个人项目',
+    tags: ['Python', 'Ollama', 'Qwythos 9B', 'Agent Runtime', 'Local Tools'],
+    highlight: '在本机运行的 Codex 风格编码 Agent，结合 Web 工作台、命令行和受控 Workspace 工具完成真实开发任务。',
+    detail: '参考 grok-build 的分层思路构建本地 Agent runtime：使用 Ollama 驱动 Qwythos 9B 模型，通过统一的消息循环调用文件读写、路径检查、补丁修改和 PowerShell 命令工具。项目提供响应式三栏 Web 工作台、任务历史、流式 NDJSON 对话和安全边界，默认只绑定本机服务，不依赖云端模型或 npm/PyPI 运行时。',
+    featured: true,
+    links: [
+      { label: 'GitHub', href: 'https://github.com/Tmakerchima/portfolio-rag' },
     ],
   },
   {
