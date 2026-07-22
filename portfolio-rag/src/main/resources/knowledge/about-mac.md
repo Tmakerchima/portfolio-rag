@@ -130,6 +130,16 @@
 
 技术栈：JavaScript、Qwen、量化研究、样本外回测、风险建模、Vercel、Railway
 
+### 10. LocalAgent 本地编码 Agent（2026，个人，已上线并开源）
+
+开发一套完全在本机运行的编码 Agent，提供类似 Codex 的浏览器三栏工作台与命令行界面。系统以 **Ollama + Qwen 3.5 9B** 完成本地推理与原生工具调用，浏览器和 CLI 复用同一个 Python Agent runtime；网页服务器将模型步骤、工具调用和最终回答转换为 NDJSON 流式事件。项目只使用 Python 标准库，不依赖 npm、PyPI 或虚拟环境。
+
+Agent 支持 Plan、Edits、Auto 三种权限模式，能够读取与原子写入工作区文件、精确替换内容并执行受控 PowerShell 命令。文件工具限制绝对路径与 `..` 越界，默认阻止删除、磁盘操作、强制 Git 和网络下载等高风险命令；网页服务器与 Ollama 默认仅绑定 `127.0.0.1`。项目还实现了任务队列、停止控制、模型切换、上下文隔离、工具运行记录及自动化测试。
+
+代码：https://github.com/Tmakerchima/localAgent
+
+技术栈：Python、Ollama、Qwen 3.5 9B、Tool Calling、Agent Loop、NDJSON Streaming、PowerShell、HTML/CSS/JavaScript、本地模型安全边界
+
 ---
 
 ## 技术栈与能力
@@ -142,7 +152,7 @@
 | Databricks | 80% | Delta Lake、Pipeline、Auto Loader 实战 |
 | Azure | 80% | Blob Storage、鉴权配置实战 |
 | 算法 | 80% | NSGA-II遗传算法、模拟退火、KNN、ItemCF、LCS |
-| AI Agent / LLM 应用 | 熟练 | Spring AI、RAG、Function Calling、MCP、流式交互、工具编排 |
+| AI Agent / LLM 应用 | 熟练 | Spring AI、RAG、Function Calling、MCP、Ollama、本地 Qwen、流式交互、工具编排 |
 | Python | 一般 | 推荐算法、数据处理 |
 | MySQL / MyBatis-Plus | 熟练 | 多项目实战 |
 | PostgreSQL / PGVector | 熟练 | Supabase 托管数据库、向量检索、业务数据持久化 |
