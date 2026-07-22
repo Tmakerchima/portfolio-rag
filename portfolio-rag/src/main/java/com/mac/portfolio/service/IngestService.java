@@ -19,6 +19,7 @@ import java.util.List;
 public class IngestService implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(IngestService.class);
+    private static final int EMBEDDING_BATCH_SIZE = 10;
 
     private final VectorStore vectorStore;
     private final JdbcTemplate jdbcTemplate;
@@ -67,9 +68,20 @@ public class IngestService implements ApplicationRunner {
         }
 
         if (!allChunks.isEmpty()) {
-            vectorStore.add(allChunks);
+            addInBatches(allChunks);
             chunkStore.replace(allChunks);
         }
         log.info("知识库入库完成，共处理 {} 个文件、{} 个语义 chunk", total, allChunks.size());
+    }
+
+    void addInBatches(List<Document> chunks) {
+        int batchCount = (chunks.size() + EMBEDDING_BATCH_SIZE - 1) / EMBEDDING_BATCH_SIZE;
+        for (int start = 0, batchNumber = 1; start < chunks.size();
+             start += EMBEDDING_BATCH_SIZE, batchNumber++) {
+            int end = Math.min(start + EMBEDDING_BATCH_SIZE, chunks.size());
+            List<Document> batch = List.copyOf(chunks.subList(start, end));
+            log.info("写入 Embedding 批次 {}/{}，chunk 数量：{}", batchNumber, batchCount, batch.size());
+            vectorStore.add(batch);
+        }
     }
 }
