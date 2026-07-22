@@ -14,6 +14,8 @@ spring:
       chat:
         options:
           model: qwen-plus
+          temperature: 0.2
+          max-tokens: 500
       embedding:
         options:
           model: text-embedding-v3
@@ -38,6 +40,13 @@ spring:
 # 自定义配置：简历知识库路径
 portfolio:
   knowledge-path: classpath:knowledge/**/*
+  rag:
+    # 入库时按 Markdown 标题语义切块；在线先扩大向量召回，再做 metadata + lexical 本地重排。
+    max-chunk-chars: 1800
+    vector-top-k: 10
+    final-top-k: 3
+    similarity-threshold: 0.35
+    max-context-chars: 2800
 
 github:
   mcp-pat: ${GITHUB_MCP_PAT}

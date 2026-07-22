@@ -17,11 +17,11 @@ Vue 3 前端（Vercel）
 Spring Boot 3.3 后端
      ├── ChatController        →  接收请求，返回 Flux<String>
      ├── RagService             →  编排检索 + 生成流程，输出三种 SSE 帧
-     │     ├── VectorStore.search()        →  PGVector 向量检索（top 5 相关片段）
+     │     ├── HybridRetrievalService      →  Metadata Filter + PGVector + Lexical Rerank
      │     ├── ChatClient.stream()         →  调用 LLM 生成回答，按需触发工具调用
      │     └── ToolUsageTrackingCallback   →  记录本轮实际调用了哪些工具
-     └── IngestService          →  启动时把 knowledge/ 文档向量化入库
-           └── TikaDocumentReader → TokenTextSplitter → vectorStore.add()
+     └── IngestService          →  启动时把 knowledge/ 文档语义切块并向量化入库
+           └── Markdown 标题切块 + category/topic/project 元数据 → vectorStore.add()
 
 工具层（ChatClient 的 defaultToolCallbacks，与 RAG 检索完全解耦）
      ├── PortfolioInfoTools（Function Calling）
@@ -47,11 +47,11 @@ LLM 服务（DashScope OpenAI 兼容模式）
 ```
 knowledge/*.md / *.pdf / *.docx
          │
-         ▼  TikaDocumentReader（Apache Tika 解析）
-     List<Document>（原始文档）
+         ▼  Markdown 标题语义切块（PDF/Word 仍由 Apache Tika 解析）
+     List<Document>（按章节 / 项目切分）
          │
-         ▼  TokenTextSplitter（按 token 切块）
-     List<Document>（小段落 chunks）
+         ▼  写入 category / section / topic / project / chunk_id 元数据
+     List<Document>（有结构的短 chunks）
          │
          ▼  text-embedding-v3（DashScope 向量化）
      float[1024]（向量）
@@ -65,11 +65,14 @@ knowledge/*.md / *.pdf / *.docx
 ```
 用户问题（自然语言）
          │
-         ▼  text-embedding-v3（问题向量化）+ pgvector 余弦相似度检索（top 5，阈值 0.5）
-     相关简历片段（候选 context，无论模型是否用到都会作为 @@SOURCES@@ 帧发出）
+         ▼  Query Intent 路由 → Metadata Filter + text-embedding-v3 / pgvector（top 10，阈值 0.35）
+     宽召回候选片段
          │
-         ▼  QuestionAnswerAdvisor（拼装 Prompt） + defaultToolCallbacks（注册可用工具）
-     [系统Prompt] + [context] + [用户问题] + [工具列表]
+         ▼  本地融合重排（Vector 68% + Lexical 22% + Metadata 10%）
+     最相关 3 个片段（总 context 上限 2800 字符）
+         │
+         ▼  RagService 只拼装一次受约束 Prompt + defaultToolCallbacks（注册可用工具）
+     [系统 Prompt] + [精简 context] + [范围约束] + [用户问题] + [工具列表]
          │
          ▼  qwen-plus（流式生成，按需决定是否调用工具）
      Flux<String>（逐 token 返回） + ToolUsageTrackingCallback 记录实际调用的工具
@@ -129,8 +132,11 @@ portfolio-rag/
     │   ├── controller/
     │   │   └── ChatController.java      # POST /api/chat → Flux<String> SSE
     │   ├── service/
-    │   │   ├── RagService.java          # RAG 编排：检索 + 流式生成 + 三种 SSE 帧
-    │   │   └── IngestService.java       # 启动时文档向量化入库
+    │   │   ├── RagService.java               # 精简 context 拼装 + 流式生成 + 三种 SSE 帧
+    │   │   ├── HybridRetrievalService.java   # Metadata + Vector + Lexical 融合检索与本地重排
+    │   │   ├── KnowledgeDocumentChunker.java # Markdown 语义切块与结构化元数据
+    │   │   ├── KnowledgeChunkStore.java      # 入库 chunk 的只读内存快照（关键词召回降级）
+    │   │   └── IngestService.java            # 启动时语义切块并向量化入库
     │   └── tool/
     │       ├── PortfolioInfoTools.java        # Function Calling 工具（查博客最新文章）
     │       └── ToolUsageTrackingCallback.java # 包装工具调用，记录本轮实际触发了哪个工具
@@ -280,7 +286,8 @@ curl -X POST http://localhost:8080/api/chat \
 | LLM 接入 | DashScope OpenAI 兼容模式 | 国内网络无需代理，Spring AI 原生支持 OpenAI 协议 |
 | 数据库托管 | Supabase | 免费、pgvector 内置、无需本地 Docker |
 | Embedding 维度 | 1024 | text-embedding-v3 默认维度，精度与成本的平衡点 |
-| RAG 实现 | QuestionAnswerAdvisor | Spring AI 内置，无需手写 Prompt 拼装逻辑 |
+| RAG 实现 | Metadata Filter + Vector Recall + 本地 Lexical Rerank | 避免 Naive RAG 重复检索和无关 context；小型简历库无需额外 reranker 模型 |
+| Reranker | 暂不接独立模型 | 当前语料仅一个结构化个人档案，本地融合排序延迟更低、可解释且无新增调用成本；语料扩大后可在 `HybridRetrievalService` 排序阶段替换为模型 reranker |
 | GitHub 数据查询 | 真实 MCP（而非自己手写 RestClient 调 GitHub API） | 演示真正的 MCP 协议接入，而不是用同名概念包装普通 HTTP 调用 |
 | MCP 启动方式 | `spring.ai.mcp.client.initialized=false` + try-catch 兜底 | GitHub 远程 MCP 偶发握手超时（实测约 1/3 概率 >20s），若不降级会把整个应用（包括 RAG）一起拖垮启动失败 |
 | commons-lang3 版本 | 显式锁定 3.17.0 | Spring AI 1.1.0 引入的依赖树里 Maven 解析出 3.14.0，缺少 commons-compress 1.28 需要的方法，导致 Tika 解析文档时 `NoSuchMethodError` |
