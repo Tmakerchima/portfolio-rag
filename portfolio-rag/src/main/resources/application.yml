@@ -27,9 +27,7 @@ spring:
         initialize-schema: true
     mcp:
       client:
-        # 不在 Spring 自动配置阶段就同步握手——GitHub 远程 MCP 偶发慢/超时，
-        # 放在这里会直接拖垮整个应用启动（RAG/Function Calling 也一起挂掉）。
-        # 改成懒加载，真正的握手延后到 AiConfig 里手动获取工具列表时，由我们自己 try-catch 兜底
+        # 由 AgentToolProvider 主动发现工具；失败不会拖垮应用，并会在后续请求中重试。
         initialized: false
         streamable-http:
           connections:
