@@ -1,6 +1,7 @@
 package com.mac.portfolio.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mac.portfolio.tool.AgentToolProvider;
 import com.mac.portfolio.tool.ToolUsageTrackingCallback;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -36,11 +37,15 @@ public class RagService {
 
     private final ChatClient chatClient;
     private final HybridRetrievalService retrievalService;
+    private final AgentToolProvider agentToolProvider;
     private final ObjectMapper objectMapper;
 
-    public RagService(ChatClient chatClient, HybridRetrievalService retrievalService, ObjectMapper objectMapper) {
+    public RagService(ChatClient chatClient, HybridRetrievalService retrievalService,
+                      AgentToolProvider agentToolProvider,
+                      ObjectMapper objectMapper) {
         this.chatClient = chatClient;
         this.retrievalService = retrievalService;
+        this.agentToolProvider = agentToolProvider;
         this.objectMapper = objectMapper;
     }
 
@@ -48,20 +53,24 @@ public class RagService {
         return Flux.defer(() -> {
             // 只检索一次：metadata 过滤 + vector recall + 本地 lexical rerank，避免 Advisor 再次塞入一批上下文。
             List<Document> documents = retrievalService.retrieve(question);
-            Mono<String> sourcesFrame = Mono.just(toSourcesFrame(documents));
+            String sourcesFrame = toSourcesFrame(documents);
 
             // 本轮请求专属的容器：哪些工具被实际调用，由 ToolUsageTrackingCallback 在执行时写入
             List<String> invokedTools = new CopyOnWriteArrayList<>();
             String groundedPrompt = GROUNDED_USER_PROMPT.formatted(formatContext(documents), question);
 
-            Flux<String> answer = chatClient.prompt()
+            ChatClient.ChatClientRequestSpec request = chatClient.prompt()
                     .user(groundedPrompt)
-                    .toolContext(Map.of(ToolUsageTrackingCallback.CONTEXT_KEY, invokedTools))
-                    .stream()
-                    .content();
+                    .toolContext(Map.of(ToolUsageTrackingCallback.CONTEXT_KEY, invokedTools));
+            List<org.springframework.ai.tool.ToolCallback> availableTools = agentToolProvider.toolCallbacks();
+            if (!availableTools.isEmpty()) {
+                request.toolCallbacks(availableTools);
+            }
+
+            Flux<String> answer = request.stream().content();
 
             Mono<String> toolsFrame = Mono.fromSupplier(() -> toToolsFrame(invokedTools));
-            return Flux.concat(sourcesFrame, answer, toolsFrame);
+            return Flux.concat(Mono.just(sourcesFrame), answer, toolsFrame);
         });
     }
 

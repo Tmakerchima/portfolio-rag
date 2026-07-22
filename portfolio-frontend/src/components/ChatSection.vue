@@ -52,45 +52,56 @@ async function ask(q?: string) {
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
+    let sseBuffer = ''
+
+    const handleSseEvent = (event: string) => {
+      const content = event
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).replace(/^ /, ''))
+        .join('\n')
+      if (!content) return
+
+      if (content.startsWith(SOURCES_MARKER)) {
+        try {
+          sources.value = JSON.parse(content.slice(SOURCES_MARKER.length))
+        } catch {
+          sources.value = []
+        }
+        return
+      }
+
+      if (content.startsWith(TOOLS_MARKER)) {
+        try {
+          const raw: string[] = JSON.parse(content.slice(TOOLS_MARKER.length))
+          toolsUsed.value = raw.map((s) => {
+            const idx = s.indexOf(':')
+            return idx >= 0
+              ? { origin: s.slice(0, idx), name: s.slice(idx + 1) }
+              : { origin: s, name: '' }
+          })
+        } catch {
+          toolsUsed.value = []
+        }
+        return
+      }
+
+      answer.value += content
+    }
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      const chunk = decoder.decode(value, { stream: true })
-      // SSE 格式：每行 "data: xxx\n\n"，提取文本
-      const lines = chunk.split('\n')
-      for (const line of lines) {
-        if (!line.startsWith('data:')) continue
-        const content = line.slice(5)
-
-        if (content.startsWith(SOURCES_MARKER)) {
-          try {
-            sources.value = JSON.parse(content.slice(SOURCES_MARKER.length))
-          } catch {
-            sources.value = []
-          }
-          continue
-        }
-
-        if (content.startsWith(TOOLS_MARKER)) {
-          try {
-            const raw: string[] = JSON.parse(content.slice(TOOLS_MARKER.length))
-            toolsUsed.value = raw.map((s) => {
-              const idx = s.indexOf(':')
-              return idx >= 0
-                ? { origin: s.slice(0, idx), name: s.slice(idx + 1) }
-                : { origin: s, name: '' }
-            })
-          } catch {
-            toolsUsed.value = []
-          }
-          continue
-        }
-
-        answer.value += content
+      sseBuffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
+      const events = sseBuffer.split('\n\n')
+      sseBuffer = events.pop() ?? ''
+      for (const event of events) {
+        handleSseEvent(event)
       }
     }
+    sseBuffer += decoder.decode().replace(/\r\n/g, '\n')
+    if (sseBuffer.trim()) handleSseEvent(sseBuffer)
   } catch (e) {
     answer.value = '请求出错，请确认后端服务正在运行。'
   } finally {

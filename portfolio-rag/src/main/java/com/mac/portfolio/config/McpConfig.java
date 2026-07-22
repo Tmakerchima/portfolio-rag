@@ -17,6 +17,11 @@ public class McpConfig {
     @Bean
     public WebClient.Builder mcpWebClientBuilder() {
         return WebClient.builder()
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + githubMcpPat);
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + githubMcpPat)
+                // 只暴露个人网站会使用的只读工具，降低工具描述占用并提高 LLM 自主选工具的准确率。
+                .defaultHeader("X-MCP-Tools",
+                        "get_me,search_repositories,search_issues,search_pull_requests," +
+                                "get_file_contents,list_commits,get_latest_release,list_releases")
+                .defaultHeader("X-MCP-Readonly", "true");
     }
 }
