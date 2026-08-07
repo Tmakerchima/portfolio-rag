@@ -65,10 +65,11 @@ knowledge/*.md / *.pdf / *.docx
 ```
 用户问题（自然语言）
          │
-         ▼  Query Intent 路由 → Metadata Filter + text-embedding-v3 / pgvector（top 10，阈值 0.35）
+         ▼ 小语料（≤ full-context-max-chars）直接返回全部片段；大语料才走检索 ↓
+         ▼  Query Intent 路由 → Metadata Filter + text-embedding-v3 / pgvector（top 10，阈值 0.25）
      宽召回候选片段
          │
-         ▼  本地融合重排（Vector 68% + Lexical 22% + Metadata 10%）
+         ▼  本地融合重排（Vector 60% + Lexical 25% + Metadata 15%，意图命中片段额外加权）
      最相关 3 个片段（总 context 上限 2800 字符）
          │
          ▼  RagService 只拼装一次受约束 Prompt + defaultToolCallbacks（注册可用工具）
@@ -287,6 +288,8 @@ curl -X POST http://localhost:8080/api/chat \
 | 数据库托管 | Supabase | 免费、pgvector 内置、无需本地 Docker |
 | Embedding 维度 | 1024 | text-embedding-v3 默认维度，精度与成本的平衡点 |
 | RAG 实现 | Metadata Filter + Vector Recall + 本地 Lexical Rerank | 避免 Naive RAG 重复检索和无关 context；小型简历库无需额外 reranker 模型 |
+| 语料自适应 | 小语料走全量上下文，大语料走混合检索（full-context-max-chars: 8000） | 简历仅约 6400 字符，切块检索反而会漏召回（例如毕业于哪个学校检索不到教育背景）；语料超过阈值自动回退检索，保证可扩展性 |
+| 意图命中加权 | Intent 类目命中的片段额外加分（Vector 60% + Lexical 25% + Metadata 15%，命中 +0.2） | 短问题向量相似度扎堆（0.28~0.31），纯向量排序会让问教育却召回技术栈；加权后意图类目稳定置顶 |
 | Reranker | 暂不接独立模型 | 当前语料仅一个结构化个人档案，本地融合排序延迟更低、可解释且无新增调用成本；语料扩大后可在 `HybridRetrievalService` 排序阶段替换为模型 reranker |
 | GitHub 数据查询 | 真实 MCP（而非自己手写 RestClient 调 GitHub API） | 演示真正的 MCP 协议接入，而不是用同名概念包装普通 HTTP 调用 |
 | MCP 启动方式 | `spring.ai.mcp.client.initialized=false` + try-catch 兜底 | GitHub 远程 MCP 偶发握手超时（实测约 1/3 概率 >20s），若不降级会把整个应用（包括 RAG）一起拖垮启动失败 |

@@ -43,8 +43,13 @@ portfolio:
     max-chunk-chars: 1800
     vector-top-k: 10
     final-top-k: 3
-    similarity-threshold: 0.35
+    # 短问题（如"毕业于哪个学校"）向量相似度往往偏低且扎堆，0.35 会把真正相关的片段过滤掉，
+    # 导致"问教育却召回技术栈"。降到 0.25 后召回更充分，排序交给意图加权 + 词法重排。
+    similarity-threshold: 0.25
     max-context-chars: 2800
+    # 小语料全量上下文：整个知识库字符数不超过该值时，不检索而是把全部片段喂给 LLM。
+    # 当前简历约 6600 字符，因此线上走全量；知识库扩大后自动回退到混合检索。设 0 可关闭。
+    full-context-max-chars: 8000
 
 github:
   mcp-pat: ${GITHUB_MCP_PAT}

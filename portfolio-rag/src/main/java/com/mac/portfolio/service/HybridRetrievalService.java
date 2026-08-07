@@ -29,12 +29,21 @@ public class HybridRetrievalService {
     private static final Set<String> STOP_TERMS = Set.of(
             "什么", "哪些", "怎么", "如何", "一下", "介绍", "相关", "经验", "可以", "是否", "这个", "那个");
 
+    // 元数据命中了用户意图类目（metadataScore >= 0.75）时给予的额外加分。
+    // 背景：短问题的向量相似度往往挤在很窄的区间（如 0.28~0.31），
+    // 单纯靠向量分排序会让"问教育却召回技术栈"这类错位发生，这里强制让意图命中的片段跳升。
+    private static final double INTENT_MATCH_BOOST = 0.20;
+    private static final double VECTOR_WEIGHT = 0.60;
+    private static final double LEXICAL_WEIGHT = 0.25;
+    private static final double METADATA_WEIGHT = 0.15;
+
     private final VectorStore vectorStore;
     private final KnowledgeChunkStore chunkStore;
     private final int vectorTopK;
     private final int finalTopK;
     private final double similarityThreshold;
     private final int maxContextChars;
+    private final int fullContextMaxChars;
 
     public HybridRetrievalService(
             VectorStore vectorStore,
@@ -42,16 +51,28 @@ public class HybridRetrievalService {
             @Value("${portfolio.rag.vector-top-k:10}") int vectorTopK,
             @Value("${portfolio.rag.final-top-k:3}") int finalTopK,
             @Value("${portfolio.rag.similarity-threshold:0.35}") double similarityThreshold,
-            @Value("${portfolio.rag.max-context-chars:2800}") int maxContextChars) {
+            @Value("${portfolio.rag.max-context-chars:2800}") int maxContextChars,
+            @Value("${portfolio.rag.full-context-max-chars:8000}") int fullContextMaxChars) {
         this.vectorStore = vectorStore;
         this.chunkStore = chunkStore;
         this.vectorTopK = vectorTopK;
         this.finalTopK = finalTopK;
         this.similarityThreshold = similarityThreshold;
         this.maxContextChars = maxContextChars;
+        this.fullContextMaxChars = fullContextMaxChars;
     }
 
     public List<Document> retrieve(String question) {
+        List<Document> snapshot = chunkStore.snapshot();
+        int corpusChars = corpusChars(snapshot);
+        // 小语料直接给全量上下文：检索切块的收益只有在语料足够大时才体现，
+        // 简历这种几千字符的语料整份喂给 LLM 反而更准（也避免 top-k 漏召回）。
+        // 语料变大后自动走下面的混合检索，保证可扩展性。
+        if (corpusChars <= fullContextMaxChars) {
+            log.info("知识库较小（{} 字符 ≤ {}），使用全量上下文而非 top-{} 检索", corpusChars, fullContextMaxChars, finalTopK);
+            return fullContext(snapshot);
+        }
+
         IntentProfile intent = IntentProfile.from(question);
         Map<String, Candidate> candidates = new LinkedHashMap<>();
 
@@ -62,7 +83,7 @@ public class HybridRetrievalService {
         }
         mergeVectorHits(candidates, vectorHits);
 
-        for (Document document : chunkStore.snapshot()) {
+        for (Document document : snapshot) {
             double lexicalScore = lexicalScore(question, searchableText(document));
             double metadataScore = intent.metadataScore(document);
             if (lexicalScore >= 0.08 || metadataScore >= 0.75) {
@@ -76,11 +97,13 @@ public class HybridRetrievalService {
             candidate.lexicalScore = Math.max(candidate.lexicalScore,
                     lexicalScore(question, searchableText(candidate.document)));
             candidate.metadataScore = Math.max(candidate.metadataScore, intent.metadataScore(candidate.document));
-            candidate.finalScore = candidate.vectorScore * 0.68
-                    + candidate.lexicalScore * 0.22
-                    + candidate.metadataScore * 0.10;
+            double intentBoost = candidate.metadataScore >= 0.75 ? INTENT_MATCH_BOOST : 0.0;
+            candidate.finalScore = candidate.vectorScore * VECTOR_WEIGHT
+                    + candidate.lexicalScore * LEXICAL_WEIGHT
+                    + candidate.metadataScore * METADATA_WEIGHT
+                    + intentBoost;
             if (candidate.vectorScore == 0.0) {
-                candidate.finalScore = candidate.lexicalScore * 0.60 + candidate.metadataScore * 0.20;
+                candidate.finalScore = candidate.lexicalScore * 0.65 + candidate.metadataScore * 0.35 + intentBoost;
             }
         }
 
@@ -113,6 +136,32 @@ public class HybridRetrievalService {
             contextChars += text.length();
         }
         return result;
+    }
+
+    private int corpusChars(List<Document> snapshot) {
+        return snapshot.stream().mapToInt(document -> document.getText().length()).sum();
+    }
+
+    // 全量上下文：按入库顺序返回全部片段，分数标记为 1.0，跳过 top-k 与字符截断。
+    private List<Document> fullContext(List<Document> snapshot) {
+        return snapshot.stream()
+                .sorted(Comparator.comparingInt(this::chunkIndex))
+                .map(document -> {
+                    Map<String, Object> metadata = new HashMap<>(document.getMetadata());
+                    metadata.put("hybrid_score", 1.0);
+                    return Document.builder()
+                            .id(document.getId())
+                            .text(document.getText())
+                            .metadata(metadata)
+                            .score(1.0)
+                            .build();
+                })
+                .toList();
+    }
+
+    private int chunkIndex(Document document) {
+        Object index = document.getMetadata().get("chunk_index");
+        return index instanceof Number number ? number.intValue() : 0;
     }
 
     private List<Document> vectorSearch(String question, String filterExpression) {
