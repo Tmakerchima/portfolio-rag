@@ -178,8 +178,24 @@ def open_checkpoint(path: Path) -> sqlite3.Connection:
             updated_at INTEGER NOT NULL
         )
         """)
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """)
     connection.commit()
     return connection
+
+
+def checkpoint_value(connection: sqlite3.Connection, key: str) -> str:
+    row = connection.execute("SELECT value FROM state WHERE key = ?", (key,)).fetchone()
+    return row[0] if row else ""
+
+
+def set_checkpoint_value(connection: sqlite3.Connection, key: str, value: str) -> None:
+    connection.execute("INSERT OR REPLACE INTO state (key, value) VALUES (?, ?)", (key, value))
+    connection.commit()
 
 
 def write_manifest(path: Path, manifest: dict) -> None:
@@ -341,9 +357,14 @@ def main() -> int:
     connection = None
     corpus_id = args.corpus_id
     job_id = ""
+    checkpoint_corpus_id = checkpoint_value(checkpoint, "corpus_id")
+    checkpoint_job_id = checkpoint_value(checkpoint, "job_id")
     if not args.dry_run:
         if not args.database_url:
             print("--database-url or ENTERPRISE_DATABASE_URL is required", file=sys.stderr)
+            return 2
+        if args.resume and not (corpus_id or checkpoint_corpus_id):
+            print("--resume requires the original checkpoint or an explicit --corpus-id", file=sys.stderr)
             return 2
         try:
             import psycopg
@@ -351,8 +372,28 @@ def main() -> int:
             print("Install psycopg[binary] before a database run", file=sys.stderr)
             return 2
         connection = psycopg.connect(args.database_url)
-        corpus_id = create_corpus(connection, args)
-        job_id = create_job(connection, corpus_id)
+        if args.resume:
+            corpus_id = corpus_id or checkpoint_corpus_id
+            corpus_state = connection.execute(
+                "SELECT state FROM enterprise_corpora WHERE corpus_id = %s", (corpus_id,)
+            ).fetchone()
+            if not corpus_state:
+                raise RuntimeError(f"checkpoint corpus does not exist: {corpus_id}")
+            if checkpoint_job_id:
+                job_id = checkpoint_job_id
+                connection.execute("""
+                    UPDATE enterprise_ingestion_jobs
+                    SET status = 'RUNNING', attempts = attempts + 1, updated_at = now()
+                    WHERE job_id = %s AND corpus_id = %s
+                    """, (job_id, corpus_id))
+                connection.commit()
+            else:
+                job_id = create_job(connection, corpus_id)
+        else:
+            corpus_id = create_corpus(connection, args)
+            job_id = create_job(connection, corpus_id)
+        set_checkpoint_value(checkpoint, "corpus_id", corpus_id)
+        set_checkpoint_value(checkpoint, "job_id", job_id)
         ensure_staging_tables(connection, args.dimensions)
 
     for document in iter_documents(args.archive, args.source_type, args.max_documents):
@@ -361,8 +402,8 @@ def main() -> int:
         manifest["chunk_count"] += len(document_chunks)
         manifest["total_chars"] += len(document.content)
         manifest["source_counts"][document.source_type] = manifest["source_counts"].get(document.source_type, 0) + 1
-        previous = checkpoint.execute("SELECT status, content_hash FROM processed WHERE external_id = ?", (document.external_id,)).fetchone()
-        if previous and previous[0] == "DONE" and previous[1] == document.content_hash:
+        previous = checkpoint.execute("SELECT status, content_hash FROM processed WHERE external_id = ?", (document.external_id,)).fetchone() if args.resume else None
+        if args.resume and previous and previous[0] == "DONE" and previous[1] == document.content_hash:
             continue
         try:
             if not args.dry_run:
