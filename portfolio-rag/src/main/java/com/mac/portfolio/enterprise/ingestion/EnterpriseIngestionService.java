@@ -20,6 +20,7 @@ import java.util.UUID;
 public class EnterpriseIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(EnterpriseIngestionService.class);
+    private static final int EMBEDDING_BATCH_SIZE = 10;
 
     private final EnterpriseDocumentRepository repository;
     private final EnterpriseDocumentChunker chunker;
@@ -53,7 +54,7 @@ public class EnterpriseIngestionService {
 
         List<EnterpriseChunk> chunks = chunker.chunk(normalized);
         if (chunks.isEmpty()) throw new IllegalArgumentException("Enterprise document content must not be blank");
-        List<float[]> embeddings = embeddingModel.embed(chunks.stream().map(EnterpriseChunk::content).toList());
+        List<float[]> embeddings = embedInBatches(chunks);
         if (embeddings.size() != chunks.size()) {
             throw new IllegalStateException("Embedding provider returned a different number of vectors");
         }
@@ -110,6 +111,16 @@ public class EnterpriseIngestionService {
     private String stableDocumentId(EnterpriseDocumentInput input) {
         return UUID.nameUUIDFromBytes((input.source() + ":" + input.externalId())
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+    }
+
+    private List<float[]> embedInBatches(List<EnterpriseChunk> chunks) {
+        List<float[]> embeddings = new ArrayList<>(chunks.size());
+        for (int start = 0; start < chunks.size(); start += EMBEDDING_BATCH_SIZE) {
+            int end = Math.min(start + EMBEDDING_BATCH_SIZE, chunks.size());
+            embeddings.addAll(embeddingModel.embed(chunks.subList(start, end).stream()
+                    .map(EnterpriseChunk::content).toList()));
+        }
+        return embeddings;
     }
 
     public enum IngestionStatus {

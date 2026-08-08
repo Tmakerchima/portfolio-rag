@@ -17,7 +17,9 @@ public record EnterpriseAccessContext(String role, String tenantId, String depar
             case "engineering", "finance", "hr" -> role;
             default -> null;
         };
-        return new EnterpriseAccessContext(role, normalizeNullable(requestedTenantId), department);
+        String tenantId = normalizeNullable(requestedTenantId);
+        if (tenantId == null && !"admin".equals(role)) tenantId = "default";
+        return new EnterpriseAccessContext(role, tenantId, department);
     }
 
     public boolean isAdmin() {

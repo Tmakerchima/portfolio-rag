@@ -65,6 +65,7 @@ enterprise:
     max-context-chars: ${ENTERPRISE_RAG_MAX_CONTEXT_CHARS:9000}
     similarity-threshold: ${ENTERPRISE_RAG_SIMILARITY_THRESHOLD:0.20}
     strategy: ${ENTERPRISE_RAG_STRATEGY:HYBRID}
+    rerank-enabled: ${ENTERPRISE_RAG_RERANK_ENABLED:true}
     admin-token: ${ENTERPRISE_RAG_ADMIN_TOKEN:}
 
 github:

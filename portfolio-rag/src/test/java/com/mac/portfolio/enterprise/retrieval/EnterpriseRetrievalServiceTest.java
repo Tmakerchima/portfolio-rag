@@ -73,7 +73,7 @@ class EnterpriseRetrievalServiceTest {
                                                EmbeddingModel embeddingModel,
                                                Reranker reranker) {
         return new EnterpriseRetrievalService(repository, embeddingModel, new RrfFusion(), reranker,
-                12, 12, 5, 60, 9000, 0.2);
+                12, 12, 5, 60, 9000, 0.2, true);
     }
 
     private EnterpriseSearchHit hit(String id, String content) {

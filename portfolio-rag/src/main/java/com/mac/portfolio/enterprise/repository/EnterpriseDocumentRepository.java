@@ -1,6 +1,7 @@
 package com.mac.portfolio.enterprise.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mac.portfolio.enterprise.model.EnterpriseAccessContext;
 import com.mac.portfolio.enterprise.model.EnterpriseChunk;
@@ -10,7 +11,6 @@ import com.mac.portfolio.enterprise.model.EnterpriseSearchHit;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -156,7 +156,7 @@ public class EnterpriseDocumentRepository {
                 rs.getInt("chunk_index"),
                 rs.getDouble("score"),
                 rowNum + 1,
-                Map.of());
+                readMetadata(rs.getString("metadata")));
     }
 
     private String toJson(Map<String, Object> value) {
@@ -164,6 +164,15 @@ public class EnterpriseDocumentRepository {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Enterprise metadata is not JSON serializable", e);
+        }
+    }
+
+    private Map<String, Object> readMetadata(String value) {
+        if (value == null || value.isBlank()) return Map.of();
+        try {
+            return objectMapper.readValue(value, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            return Map.of();
         }
     }
 

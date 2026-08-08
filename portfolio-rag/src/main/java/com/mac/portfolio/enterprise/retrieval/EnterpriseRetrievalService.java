@@ -28,6 +28,7 @@ public class EnterpriseRetrievalService {
     private final int rrfK;
     private final int maxContextChars;
     private final double similarityThreshold;
+    private final boolean rerankEnabled;
 
     public EnterpriseRetrievalService(
             EnterpriseDocumentRepository repository,
@@ -39,7 +40,8 @@ public class EnterpriseRetrievalService {
             @Value("${enterprise.rag.final-top-k:5}") int finalTopK,
             @Value("${enterprise.rag.rrf-k:60}") int rrfK,
             @Value("${enterprise.rag.max-context-chars:9000}") int maxContextChars,
-            @Value("${enterprise.rag.similarity-threshold:0.20}") double similarityThreshold) {
+            @Value("${enterprise.rag.similarity-threshold:0.20}") double similarityThreshold,
+            @Value("${enterprise.rag.rerank-enabled:true}") boolean rerankEnabled) {
         this.repository = repository;
         this.embeddingModel = embeddingModel;
         this.rrfFusion = rrfFusion;
@@ -50,6 +52,7 @@ public class EnterpriseRetrievalService {
         this.rrfK = rrfK;
         this.maxContextChars = maxContextChars;
         this.similarityThreshold = similarityThreshold;
+        this.rerankEnabled = rerankEnabled;
     }
 
     public EnterpriseRetrievalResult retrieve(String query, EnterpriseAccessContext access,
@@ -93,14 +96,14 @@ public class EnterpriseRetrievalService {
         long rrfMs = elapsedMs(rrfStarted);
 
         long rerankStarted = System.nanoTime();
-        if (strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK) {
+        if (strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK && rerankEnabled) {
             try {
                 candidates = reranker.rerank(safeQuery, candidates);
             } catch (Exception e) {
                 log.warn("Enterprise reranker failed; using RRF result: {}", e.getMessage());
             }
         }
-        long rerankMs = strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK ? elapsedMs(rerankStarted) : 0;
+        long rerankMs = strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK && rerankEnabled ? elapsedMs(rerankStarted) : 0;
 
         List<EnterpriseSearchHit> finalHits = limitContext(candidates);
         return new EnterpriseRetrievalResult(finalHits, strategy,

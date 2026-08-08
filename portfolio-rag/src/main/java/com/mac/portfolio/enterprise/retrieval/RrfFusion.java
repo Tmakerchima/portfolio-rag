@@ -2,7 +2,6 @@ package com.mac.portfolio.enterprise.retrieval;
 
 import com.mac.portfolio.enterprise.model.EnterpriseSearchHit;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,32 +14,30 @@ public class RrfFusion {
                                           List<EnterpriseSearchHit> keywordHits,
                                           int rrfK,
                                           int finalTopK) {
-        Map<String, FusionScore> scores = new LinkedHashMap<>();
-        add(scores, vectorHits, rrfK);
-        add(scores, keywordHits, rrfK);
-        return scores.values().stream()
-                .sorted(Comparator.comparingDouble(FusionScore::score).reversed()
-                        .thenComparing(value -> value.hit().chunkId()))
+        if (rrfK < 1 || finalTopK < 1) return List.of();
+        Map<String, EnterpriseSearchHit> hits = new LinkedHashMap<>();
+        Map<String, Double> scores = new LinkedHashMap<>();
+        add(hits, scores, vectorHits, rrfK);
+        add(hits, scores, keywordHits, rrfK);
+        List<EnterpriseSearchHit> ranked = scores.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue(Comparator.reverseOrder())
+                        .thenComparing(Map.Entry::getKey))
                 .limit(finalTopK)
-                .map(value -> value.hit().withScore(value.score(), value.rank()))
+                .map(entry -> hits.get(entry.getKey()).withScore(entry.getValue(), 0))
+                .toList();
+        return java.util.stream.IntStream.range(0, ranked.size())
+                .mapToObj(index -> ranked.get(index).withScore(ranked.get(index).score(), index + 1))
                 .toList();
     }
 
-    private void add(Map<String, FusionScore> scores, List<EnterpriseSearchHit> hits, int rrfK) {
-        if (hits == null) return;
-        for (int index = 0; index < hits.size(); index++) {
-            EnterpriseSearchHit hit = hits.get(index);
-            FusionScore current = scores.get(hit.chunkId());
+    private void add(Map<String, EnterpriseSearchHit> hits, Map<String, Double> scores,
+                     List<EnterpriseSearchHit> rankedHits, int rrfK) {
+        if (rankedHits == null) return;
+        for (int index = 0; index < rankedHits.size(); index++) {
+            EnterpriseSearchHit hit = rankedHits.get(index);
             double contribution = 1.0 / (rrfK + index + 1);
-            if (current == null) scores.put(hit.chunkId(), new FusionScore(hit, contribution, 0));
-            else scores.put(hit.chunkId(), new FusionScore(current.hit(), current.score() + contribution, current.rank()));
-        }
-        int rank = 1;
-        for (Map.Entry<String, FusionScore> entry : scores.entrySet()) {
-            FusionScore value = entry.getValue();
-            if (value.rank() == 0) entry.setValue(new FusionScore(value.hit(), value.score(), rank++));
+            hits.putIfAbsent(hit.chunkId(), hit);
+            scores.merge(hit.chunkId(), contribution, Double::sum);
         }
     }
-
-    private record FusionScore(EnterpriseSearchHit hit, double score, int rank) {}
 }

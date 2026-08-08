@@ -10,7 +10,7 @@ import sys
 import urllib.error
 import urllib.request
 import zipfile
-from collections import defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Iterable
 
@@ -43,16 +43,40 @@ def external_id(path_name: str) -> str:
     return match.group(1) if match else Path(path_name).stem
 
 
-def read_documents(path: Path) -> Iterable[dict]:
+def iter_entries(path: Path, include_content: bool) -> Iterable[tuple[str, str, str | None]]:
     if path.is_dir():
         for file in sorted(path.rglob("*.txt")):
-            yield make_document(file.name, source_type(str(file.relative_to(path))), file.read_text(encoding="utf-8"))
+            kind = source_type(str(file.relative_to(path)))
+            yield file.name, kind, file.read_text(encoding="utf-8") if include_content else None
         return
     with zipfile.ZipFile(path) as archive:
         for member in sorted(archive.namelist()):
             if member.endswith("/") or not member.lower().endswith(".txt"):
                 continue
-            yield make_document(Path(member).name, source_type(member), archive.read(member).decode("utf-8", errors="replace"))
+            text = archive.read(member).decode("utf-8", errors="replace") if include_content else None
+            yield Path(member).name, source_type(member), text
+
+
+def read_documents(path: Path, limit: int) -> list[dict]:
+    # Count only names/types first; do not load the entire corpus into memory.
+    counts = Counter(kind for _, kind, _ in iter_entries(path, include_content=False))
+    kinds = sorted(counts)
+    if not kinds:
+        return []
+    base, remainder = divmod(limit, len(kinds))
+    quotas = {kind: min(counts[kind], base + (index < remainder)) for index, kind in enumerate(kinds)}
+    selected: list[dict] = []
+    used = Counter()
+    for file_name, kind, text in iter_entries(path, include_content=True):
+        if used[kind] >= quotas[kind]:
+            continue
+        if text is None:
+            continue
+        selected.append(make_document(file_name, kind, text))
+        used[kind] += 1
+        if len(selected) >= limit:
+            break
+    return selected
 
 
 def make_document(file_name: str, kind: str, text: str) -> dict:
@@ -69,24 +93,6 @@ def make_document(file_name: str, kind: str, text: str) -> dict:
         "accessLevel": "public",
         "metadata": {"benchmark_file": file_name, "benchmark": "EnterpriseRAG-Bench"},
     }
-
-
-def stratified_sample(documents: Iterable[dict], limit: int) -> list[dict]:
-    buckets: dict[str, list[dict]] = defaultdict(list)
-    for document in documents:
-        buckets[document["sourceType"]].append(document)
-    result: list[dict] = []
-    keys = sorted(buckets)
-    index = 0
-    while len(result) < limit and keys:
-        key = keys[index % len(keys)]
-        if buckets[key]:
-            result.append(buckets[key].pop(0))
-        else:
-            keys.remove(key)
-            index -= 1
-        index += 1
-    return result
 
 
 def post_documents(api_base: str, token: str, documents: list[dict], batch_size: int) -> None:
@@ -107,18 +113,17 @@ def post_documents(api_base: str, token: str, documents: list[dict], batch_size:
 
 def main() -> int:
     args = parse_args()
-    documents = list(read_documents(args.archive))
+    documents = read_documents(args.archive, args.max_documents)
     if not documents:
         print("No .txt documents found", file=sys.stderr)
         return 2
-    selected = stratified_sample(documents, min(args.max_documents, len(documents)))
-    for document in selected:
+    for document in documents:
         document["tenantId"] = args.tenant_id
         document["department"] = args.department
         document["accessLevel"] = args.access_level
-    kinds = sorted({document["sourceType"] for document in selected})
-    print(f"selected {len(selected)} documents across source types: {', '.join(kinds)}")
-    post_documents(args.api_base, args.admin_token, selected, args.batch_size)
+    kinds = sorted({document["sourceType"] for document in documents})
+    print(f"selected {len(documents)} documents across source types: {', '.join(kinds)}")
+    post_documents(args.api_base, args.admin_token, documents, args.batch_size)
     return 0
 
 
