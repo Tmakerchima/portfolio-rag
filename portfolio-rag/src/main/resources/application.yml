@@ -51,6 +51,22 @@ portfolio:
     # 当前简历约 6600 字符，因此线上走全量；知识库扩大后自动回退到混合检索。设 0 可关闭。
     full-context-max-chars: 8000
 
+# EnterpriseRAG uses separate enterprise_* tables and is never ingested at startup.
+# Apply the additive migration in db/migration manually before enabling production ingestion.
+enterprise:
+  rag:
+    enabled: ${ENTERPRISE_RAG_ENABLED:true}
+    max-documents: ${ENTERPRISE_RAG_MAX_DOCUMENTS:5000}
+    max-chunk-chars: ${ENTERPRISE_RAG_MAX_CHUNK_CHARS:1600}
+    vector-top-k: ${ENTERPRISE_RAG_VECTOR_TOP_K:12}
+    keyword-top-k: ${ENTERPRISE_RAG_KEYWORD_TOP_K:12}
+    final-top-k: ${ENTERPRISE_RAG_FINAL_TOP_K:5}
+    rrf-k: ${ENTERPRISE_RAG_RRF_K:60}
+    max-context-chars: ${ENTERPRISE_RAG_MAX_CONTEXT_CHARS:9000}
+    similarity-threshold: ${ENTERPRISE_RAG_SIMILARITY_THRESHOLD:0.20}
+    strategy: ${ENTERPRISE_RAG_STRATEGY:HYBRID}
+    admin-token: ${ENTERPRISE_RAG_ADMIN_TOKEN:}
+
 github:
   mcp-pat: ${GITHUB_MCP_PAT}
 
