@@ -1,6 +1,7 @@
 package com.mac.portfolio.enterprise.retrieval;
 
 import com.mac.portfolio.enterprise.model.EnterpriseSearchHit;
+import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /** Reciprocal Rank Fusion keeps vector and FTS score scales independent. */
+@Component
 public class RrfFusion {
 
     public List<EnterpriseSearchHit> fuse(List<EnterpriseSearchHit> vectorHits,
