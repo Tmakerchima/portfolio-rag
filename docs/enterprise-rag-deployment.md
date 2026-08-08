@@ -6,6 +6,19 @@
 2. 确认 `vector` 扩展可用、`enterprise_documents` 和 `enterprise_chunks` 存在，以及 HNSW/GIN 索引已建立。
 3. 本任务不会自动连接生产 Supabase，也不会修改或删除现有 `vector_store`。
 
+### 语料文件在哪里
+
+仓库不携带 EnterpriseRAG-Bench 的完整语料，也不会在应用启动时自动下载或生成企业文档。下载后的源文件应放在本地运行导入脚本的目录，例如：
+
+```text
+eval/data/EnterpriseRAG-Bench/all_documents.zip
+eval/data/EnterpriseRAG-Bench/<source-type>/*.txt
+```
+
+`eval/data/` 被 `.gitignore` 忽略，避免把数百 MB/GB 的数据集提交进 Git。脚本读取 `.txt` 源文件，调用 `/api/enterprise/admin/ingest`，由后端完成 normalize → chunk → embedding → PostgreSQL 写入。
+
+如果 Supabase Table Editor 搜索不到 `enterprise_documents` / `enterprise_chunks`，说明上面的 migration 尚未执行；如果表存在但行数为 0，说明 migration 已执行但导入命令尚未运行。可以先查看 `GET /api/enterprise/health`，它会分别返回 `MIGRATION_REQUIRED`、`EMPTY` 或 `READY`。
+
 ## Shared Spring Boot backend
 
 在 Railway/Render 的同一个后端服务中保留原有变量，并新增：

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
+type Locale = 'zh' | 'en'
 type Role = 'public' | 'engineering' | 'finance' | 'hr' | 'admin'
 type Strategy = 'HYBRID' | 'VECTOR' | 'KEYWORD' | 'HYBRID_RERANK'
 
@@ -29,7 +30,8 @@ interface Metrics {
 }
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
-const question = ref('What is the recommended rollback approach for a failed deployment?')
+const locale = ref<Locale>('zh')
+const question = ref('What are the default limits for multipart uploads?')
 const role = ref<Role>('engineering')
 const strategy = ref<Strategy>('HYBRID')
 const answer = ref('')
@@ -39,26 +41,149 @@ const error = ref('')
 const loading = ref(false)
 const expandedSource = ref<string | null>(null)
 
-const roles: Array<{ value: Role; label: string; description: string }> = [
-  { value: 'public', label: 'Public', description: 'Public documents only' },
-  { value: 'engineering', label: 'Engineering', description: 'Engineering + public' },
-  { value: 'finance', label: 'Finance', description: 'Finance + public' },
-  { value: 'hr', label: 'HR', description: 'HR + public' },
-  { value: 'admin', label: 'Admin', description: 'All authorized demo data' },
-]
+const copy = {
+  zh: {
+    brand: '企业知识库',
+    backend: '共享 Spring Boot 后端',
+    language: '语言',
+    kicker: 'ENTERPRISE KNOWLEDGE / RAG',
+    title: '让每一个答案，\n都有证据。',
+    lede: '面向企业内部知识的检索与问答工作台。增量索引、ACL、PostgreSQL FTS 与 PGVector，在一个清晰的证据链里协同工作。',
+    architecture: '向量 + 关键词 → 融合排序 → grounded answer',
+    queryKicker: 'QUERY CONSOLE',
+    queryTitle: '向知识库提问',
+    live: '在线',
+    question: '问题',
+    role: '角色',
+    strategy: '检索策略',
+    run: '开始检索',
+    retrieving: '检索中…',
+    aclNote: '先执行权限过滤，再进行排序',
+    examples: '试试这些问题',
+    responseKicker: 'GROUNDED RESPONSE',
+    responseTitle: '回答',
+    emptyTitle: '你的回答会出现在这里。',
+    emptyNote: '来源与延迟指标会随流式回答返回。',
+    evidenceKicker: 'EVIDENCE',
+    evidenceTitle: '检索来源',
+    evidenceEmpty: '运行一次查询，查看文档级证据。',
+    observabilityKicker: 'OBSERVABILITY',
+    observabilityTitle: '链路指标',
+    metricsEmpty: '回答完成后显示检索和模型耗时。',
+    candidates: '候选片段',
+    contextChunks: '上下文片段',
+    footer: 'EnterpriseRAG · 企业知识库检索演示',
+    api: 'API',
+    notConfigured: '未配置',
+    missingApi: '未配置后端地址。请在 Vercel 项目中设置 VITE_API_BASE_URL。',
+    networkError: '无法连接后端。请检查 Railway 服务是否正在运行。',
+    backendDown: '后端暂时不可用（Railway 返回 502）。请先恢复后端服务。',
+    timeout: '请求超时。后端可能正在冷启动或等待模型响应。',
+    requestFailed: '请求失败',
+    public: 'Public / 公开',
+    engineering: 'Engineering / 工程',
+    finance: 'Finance / 财务',
+    hr: 'HR / 人力',
+    admin: 'Admin / 管理员',
+    publicDescription: '仅查看公开文档',
+    engineeringDescription: '工程文档与公开文档',
+    financeDescription: '财务文档与公开文档',
+    hrDescription: '人力文档与公开文档',
+    adminDescription: '查看全部授权演示数据',
+    hybrid: 'Hybrid RRF / 混合',
+    vector: 'Vector / 向量',
+    keyword: 'Keyword / 关键词',
+    rerank: 'Hybrid + reranker / 混合重排',
+  },
+  en: {
+    brand: 'Enterprise knowledge',
+    backend: 'shared Spring Boot backend',
+    language: 'Language',
+    kicker: 'ENTERPRISE KNOWLEDGE / RAG',
+    title: 'Every answer\nwith evidence.',
+    lede: 'A focused workspace for searching internal knowledge. Incremental indexing, ACLs, PostgreSQL FTS and PGVector work together as one observable evidence chain.',
+    architecture: 'vector + keyword → fusion ranking → grounded answer',
+    queryKicker: 'QUERY CONSOLE',
+    queryTitle: 'Ask the knowledge base',
+    live: 'live',
+    question: 'Question',
+    role: 'Role',
+    strategy: 'Retrieval strategy',
+    run: 'Run query',
+    retrieving: 'Retrieving…',
+    aclNote: 'Authorization is applied before ranking',
+    examples: 'Try a question',
+    responseKicker: 'GROUNDED RESPONSE',
+    responseTitle: 'Answer',
+    emptyTitle: 'Your grounded answer will appear here.',
+    emptyNote: 'Sources and latency metrics arrive with the stream.',
+    evidenceKicker: 'EVIDENCE',
+    evidenceTitle: 'Retrieved sources',
+    evidenceEmpty: 'Run a query to inspect document-level evidence.',
+    observabilityKicker: 'OBSERVABILITY',
+    observabilityTitle: 'Pipeline metrics',
+    metricsEmpty: 'Retrieval and model timings appear after the answer completes.',
+    candidates: 'candidates',
+    contextChunks: 'context chunks',
+    footer: 'EnterpriseRAG · enterprise knowledge retrieval demo',
+    api: 'API',
+    notConfigured: 'not configured',
+    missingApi: 'The backend URL is not configured. Set VITE_API_BASE_URL in the Vercel project.',
+    networkError: 'Cannot reach the backend. Check that the Railway service is running.',
+    backendDown: 'The backend is unavailable (Railway returned 502). Restore the backend service first.',
+    timeout: 'The request timed out. The backend may be cold-starting or waiting for the model.',
+    requestFailed: 'Request failed',
+    public: 'Public',
+    engineering: 'Engineering',
+    finance: 'Finance',
+    hr: 'HR',
+    admin: 'Admin',
+    publicDescription: 'Public documents only',
+    engineeringDescription: 'Engineering + public documents',
+    financeDescription: 'Finance + public documents',
+    hrDescription: 'HR + public documents',
+    adminDescription: 'All authorized demo data',
+    hybrid: 'Hybrid RRF',
+    vector: 'Vector only',
+    keyword: 'Keyword only',
+    rerank: 'Hybrid + reranker',
+  },
+} as const
 
-const examples = [
-  'What are the default limits for multipart uploads?',
-  'How should an EU region outage fail over, and what are the recovery targets?',
-  'What is the recommended two-stage process for rotating signing credentials?',
-]
+type CopyKey = keyof typeof copy.en
+const t = (key: CopyKey) => copy[locale.value][key]
 
-const selectedRole = computed(() => roles.find((item) => item.value === role.value))
+const roles = computed(() => [
+  { value: 'public' as Role, label: t('public'), description: t('publicDescription') },
+  { value: 'engineering' as Role, label: t('engineering'), description: t('engineeringDescription') },
+  { value: 'finance' as Role, label: t('finance'), description: t('financeDescription') },
+  { value: 'hr' as Role, label: t('hr'), description: t('hrDescription') },
+  { value: 'admin' as Role, label: t('admin'), description: t('adminDescription') },
+])
+
+const examples = computed(() => locale.value === 'zh'
+  ? [
+      'What are the default limits for multipart uploads?',
+      'How should an EU region outage fail over, and what are the recovery targets?',
+      'What is the recommended two-stage process for rotating signing credentials?',
+    ]
+  : [
+      'What are the default limits for multipart uploads?',
+      'How should an EU region outage fail over, and what are the recovery targets?',
+      'What is the recommended two-stage process for rotating signing credentials?',
+    ])
+
+const selectedRole = computed(() => roles.value.find((item) => item.value === role.value))
 
 async function ask(questionOverride?: string) {
   if (questionOverride) question.value = questionOverride
   const trimmed = question.value.trim()
   if (!trimmed || loading.value) return
+
+  if (!apiBase) {
+    error.value = t('missingApi')
+    return
+  }
 
   loading.value = true
   answer.value = ''
@@ -66,14 +191,20 @@ async function ask(questionOverride?: string) {
   metrics.value = null
   error.value = ''
   expandedSource.value = null
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 60_000)
 
   try {
     const response = await fetch(`${apiBase}/api/enterprise/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       body: JSON.stringify({ question: trimmed, role: role.value, strategy: strategy.value }),
+      signal: controller.signal,
     })
-    if (!response.ok) throw new Error(`Request failed (${response.status})`)
+    if (!response.ok) {
+      if (response.status === 502 || response.status === 503) throw new Error('BACKEND_UNAVAILABLE')
+      throw new Error(`${t('requestFailed')} (${response.status})`)
+    }
     if (!response.body) throw new Error('Streaming response is unavailable')
 
     const reader = response.body.getReader()
@@ -91,8 +222,17 @@ async function ask(questionOverride?: string) {
       }
     }
   } catch (requestError) {
-    error.value = requestError instanceof Error ? requestError.message : 'Request failed'
+    if (requestError instanceof DOMException && requestError.name === 'AbortError') {
+      error.value = t('timeout')
+    } else if (requestError instanceof TypeError) {
+      error.value = t('networkError')
+    } else if (requestError instanceof Error && requestError.message === 'BACKEND_UNAVAILABLE') {
+      error.value = t('backendDown')
+    } else {
+      error.value = requestError instanceof Error ? requestError.message : t('requestFailed')
+    }
   } finally {
+    window.clearTimeout(timeout)
     loading.value = false
   }
 }
@@ -113,7 +253,7 @@ function handleEvent(event: string) {
       metrics.value = JSON.parse(data.slice('@@METRICS@@'.length)) as Metrics
     } else if (data.startsWith('@@ERROR@@')) {
       const frame = JSON.parse(data.slice('@@ERROR@@'.length)) as { message?: string }
-      error.value = frame.message || 'Enterprise request failed'
+      error.value = frame.message || t('requestFailed')
     } else {
       answer.value += data
     }
@@ -128,38 +268,45 @@ function handleEvent(event: string) {
     <header class="topbar">
       <a class="brand" href=".">
         <span class="brand-mark">ER</span>
-        <span>EnterpriseRAG</span>
+        <span>
+          <strong>EnterpriseRAG</strong>
+          <small>{{ t('brand') }}</small>
+        </span>
       </a>
-      <span class="status"><i /> shared Spring Boot backend</span>
+      <div class="topbar-actions">
+        <span class="status"><i /> {{ t('backend') }}</span>
+        <label class="language-control">
+          <span>{{ t('language') }}</span>
+          <select v-model="locale" aria-label="Language">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+      </div>
     </header>
 
-    <main class="layout">
-      <section class="intro">
-        <p class="eyebrow">RETRIEVAL SYSTEM / DEMO</p>
-        <h1>Enterprise Knowledge<br /><em>Assistant</em></h1>
-        <p class="lede">
-          A production-shaped RAG pipeline for noisy internal knowledge: incremental indexing,
-          PostgreSQL Full-Text Search, PGVector, ACL-aware retrieval and RRF fusion.
-        </p>
-        <div class="architecture-line">
-          <span>VECTOR</span><b>+</b><span>FTS</span><b>→</b><span>RRF</span><b>→</b><span>LLM</span>
-        </div>
+    <main class="page-content">
+      <section class="hero">
+        <p class="eyebrow">{{ t('kicker') }}</p>
+        <h1>{{ t('title') }}</h1>
+        <p class="lede">{{ t('lede') }}</p>
+        <p class="architecture-line">{{ t('architecture') }}</p>
       </section>
 
-      <section class="control-panel panel">
-        <div class="panel-heading">
+      <section class="query-card card">
+        <div class="section-heading">
           <div>
-            <p class="eyebrow">QUERY CONSOLE</p>
-            <h2>Ask the knowledge base</h2>
+            <p class="eyebrow">{{ t('queryKicker') }}</p>
+            <h2>{{ t('queryTitle') }}</h2>
           </div>
-          <span class="live-pill"><i /> live</span>
+          <span class="live-pill"><i /> {{ t('live') }}</span>
         </div>
         <form @submit.prevent="ask()">
-          <label for="question">Question</label>
+          <label for="question">{{ t('question') }}</label>
           <textarea id="question" v-model="question" rows="4" :disabled="loading" />
           <div class="form-row">
             <label>
-              Role
+              {{ t('role') }}
               <select v-model="role" :disabled="loading">
                 <option v-for="item in roles" :key="item.value" :value="item.value">
                   {{ item.label }}
@@ -167,52 +314,53 @@ function handleEvent(event: string) {
               </select>
             </label>
             <label>
-              Strategy
+              {{ t('strategy') }}
               <select v-model="strategy" :disabled="loading">
-                <option value="HYBRID">Hybrid RRF</option>
-                <option value="VECTOR">Vector only</option>
-                <option value="KEYWORD">Keyword only</option>
-                <option value="HYBRID_RERANK">Hybrid + reranker</option>
+                <option value="HYBRID">{{ t('hybrid') }}</option>
+                <option value="VECTOR">{{ t('vector') }}</option>
+                <option value="KEYWORD">{{ t('keyword') }}</option>
+                <option value="HYBRID_RERANK">{{ t('rerank') }}</option>
               </select>
             </label>
             <button type="submit" :disabled="loading || !question.trim()">
               <span v-if="loading" class="spinner" />
-              {{ loading ? 'Retrieving…' : 'Run query' }}
+              {{ loading ? t('retrieving') : t('run') }}
             </button>
           </div>
-          <p class="selection-note">{{ selectedRole?.description }} · ACL is applied before ranking</p>
+          <p class="selection-note">{{ selectedRole?.description }} · {{ t('aclNote') }}</p>
         </form>
         <div class="examples">
-          <span>Try an example</span>
+          <span>{{ t('examples') }}</span>
           <button v-for="example in examples" :key="example" type="button" @click="ask(example)">
             {{ example }}
           </button>
         </div>
+        <div class="api-note">{{ t('api') }} · {{ apiBase || t('notConfigured') }}</div>
       </section>
 
-      <section class="answer-section panel">
-        <div class="panel-heading compact">
+      <section class="answer-card card">
+        <div class="section-heading compact">
           <div>
-            <p class="eyebrow">GROUNDED RESPONSE</p>
-            <h2>Answer</h2>
+            <p class="eyebrow">{{ t('responseKicker') }}</p>
+            <h2>{{ t('responseTitle') }}</h2>
           </div>
           <span v-if="metrics" class="request-id">{{ metrics.request_id.slice(0, 8) }}</span>
         </div>
-        <div v-if="error" class="error-message">{{ error }}</div>
+        <div v-if="error" class="error-message" role="alert">{{ error }}</div>
         <div v-else-if="answer" class="answer-copy">{{ answer }}</div>
         <div v-else class="empty-state">
-          <span class="empty-icon">⌁</span>
-          <p>Your grounded answer will appear here.</p>
-          <small>Sources and latency metrics arrive with the stream.</small>
+          <span class="empty-icon">✳</span>
+          <p>{{ t('emptyTitle') }}</p>
+          <small>{{ t('emptyNote') }}</small>
         </div>
       </section>
 
       <section class="results-grid">
-        <div class="panel sources-panel">
-          <div class="panel-heading compact">
+        <div class="card sources-panel">
+          <div class="section-heading compact">
             <div>
-              <p class="eyebrow">EVIDENCE</p>
-              <h2>Retrieved sources <span>{{ sources.length }}</span></h2>
+              <p class="eyebrow">{{ t('evidenceKicker') }}</p>
+              <h2>{{ t('evidenceTitle') }} <span>{{ sources.length }}</span></h2>
             </div>
           </div>
           <div v-if="sources.length" class="source-list">
@@ -225,14 +373,14 @@ function handleEvent(event: string) {
               <p v-if="expandedSource === source.chunk_id">{{ source.chunk }}</p>
             </article>
           </div>
-          <p v-else class="muted">Run a query to inspect document-level evidence.</p>
+          <p v-else class="muted">{{ t('evidenceEmpty') }}</p>
         </div>
 
-        <div class="panel metrics-panel">
-          <div class="panel-heading compact">
+        <div class="card metrics-panel">
+          <div class="section-heading compact">
             <div>
-              <p class="eyebrow">OBSERVABILITY</p>
-              <h2>Pipeline metrics</h2>
+              <p class="eyebrow">{{ t('observabilityKicker') }}</p>
+              <h2>{{ t('observabilityTitle') }}</h2>
             </div>
           </div>
           <div v-if="metrics" class="metric-grid">
@@ -243,10 +391,10 @@ function handleEvent(event: string) {
             <div><span>LLM</span><strong>{{ metrics.llm_ms }}<small>ms</small></strong></div>
             <div class="total"><span>Total</span><strong>{{ metrics.total_ms }}<small>ms</small></strong></div>
           </div>
-          <div v-else class="metric-placeholder">Metrics are emitted after the answer completes.</div>
+          <div v-else class="metric-placeholder">{{ t('metricsEmpty') }}</div>
           <div v-if="metrics" class="metric-footer">
-            <span>{{ metrics.candidate_count }} candidates</span>
-            <span>{{ metrics.final_context_count }} context chunks</span>
+            <span>{{ metrics.candidate_count }} {{ t('candidates') }}</span>
+            <span>{{ metrics.final_context_count }} {{ t('contextChunks') }}</span>
             <span>{{ metrics.strategy }}</span>
           </div>
         </div>
@@ -254,7 +402,7 @@ function handleEvent(event: string) {
     </main>
 
     <footer>
-      <span>EnterpriseRAG · architecture demo</span>
+      <span>{{ t('footer') }}</span>
       <span>Vue 3 · Spring AI · PostgreSQL · PGVector</span>
     </footer>
   </div>
