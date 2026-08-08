@@ -1,3 +1,13 @@
 profile.pdf
 claude-code-prompt.md
 .claude/
+
+# EnterpriseRAG-Bench is downloaded separately and must never be committed.
+eval/data/
+eval/dataset/
+eval/results/*
+!eval/results/.gitkeep
+
+# Generated frontend dependencies and builds.
+**/node_modules/
+**/dist/

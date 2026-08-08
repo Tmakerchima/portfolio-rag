@@ -296,3 +296,23 @@ curl -X POST http://localhost:8080/api/chat \
 | commons-lang3 版本 | 显式锁定 3.17.0 | Spring AI 1.1.0 引入的依赖树里 Maven 解析出 3.14.0，缺少 commons-compress 1.28 需要的方法，导致 Tika 解析文档时 `NoSuchMethodError` |
 | Spring AI 2.0 | 暂不升级 | 强制要求 Spring Boot 4.0，属于平台级迁移而非简单版本号变更，生态尚新，作品集项目优先稳定可演示 |
 | 工具调用可观测性 | `ToolUsageTrackingCallback` 包装所有工具 + `@@TOOLS@@` SSE 帧 | 让前端能区分一次回答到底是 RAG、Function Calling 还是 MCP 产出的，便于演示和调试 |
+
+## EnterpriseRAG
+
+本项目还提供一个 EnterpriseRAG demo：它与 Resume RAG 共用当前 Spring Boot backend，但使用独立的 `enterprise_documents` / `enterprise_chunks` 表、独立 API 和独立前端 `enterprise-rag-frontend`。
+
+两种语料使用不同策略是有意设计：Resume 只有少量内容，full context 更简单且不会因为 top-k 检索漏掉教育背景等事实；Enterprise 语料规模大、持续更新，使用：
+
+```text
+incremental indexing → PGVector HNSW + PostgreSQL FTS/GIN → RRF → grounded LLM
+```
+
+Enterprise ingestion 不是启动任务，不会清空 `vector_store`。先人工执行 `src/main/resources/db/migration/V1__enterprise_rag.sql`，再配置 `ENTERPRISE_RAG_ADMIN_TOKEN`，通过受保护的 `/api/enterprise/admin/ingest` 导入。`eval/import_enterprise_bench.py` 按官方 EnterpriseRAG-Bench `.txt` 导出格式支持 1000 / 5000 / 10000 / 50000 文档规模。
+
+新增问答接口为 `POST /api/enterprise/chat`，请求可传 `role: public | engineering | finance | hr | admin` 与 `strategy: VECTOR | KEYWORD | HYBRID | HYBRID_RERANK`。SSE 专属帧包括 `@@SOURCES@@` 和 `@@METRICS@@`，不会改变现有 `/api/chat` 的 `@@SOURCES@@` / `@@TOOLS@@` 协议。
+
+详细架构、迁移和离线评估说明见：
+
+- `docs/enterprise-rag-architecture.md`
+- `docs/enterprise-rag-deployment.md`
+- `eval/README.md`

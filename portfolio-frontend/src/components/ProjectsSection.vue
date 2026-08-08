@@ -20,6 +20,20 @@ interface Project {
 
 const projects: Project[] = [
   {
+    name: 'EnterpriseRAG · 企业知识库助手',
+    period: '2026 · 个人项目',
+    tags: ['Java 21', 'Spring AI', 'PGVector', 'PostgreSQL FTS', 'RRF', 'Vue 3'],
+    highlight: '面向企业级语料的增量索引与 ACL-aware 混合检索 RAG 系统。',
+    detail: '使用 PostgreSQL Full-Text Search 与 PGVector 做双路召回，通过 HNSW、RRF 融合和可插拔 reranker 处理大规模内部知识。文档按 content hash 增量入库，检索阶段应用 tenant、department、access level 权限过滤，并通过离线评估脚本接入 EnterpriseRAG-Bench。',
+    featured: true,
+    links: [
+      { label: 'GitHub', href: 'https://github.com/Tmakerchima/portfolio-rag' },
+      ...(import.meta.env.VITE_ENTERPRISE_RAG_LIVE_URL?.trim()
+        ? [{ label: 'Live site', href: import.meta.env.VITE_ENTERPRISE_RAG_LIVE_URL.trim() }]
+        : []),
+    ],
+  },
+  {
     name: 'TrendCopy AI · 多平台内容 Agent',
     period: '2026 · 个人项目',
     tags: ['Java', 'Spring Boot', 'Qwen', 'Firecrawl', 'Supabase'],
