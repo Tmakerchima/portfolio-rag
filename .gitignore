@@ -11,3 +11,5 @@ eval/results/*
 # Generated frontend dependencies and builds.
 **/node_modules/
 **/dist/
+**/__pycache__/
+*.pyc
