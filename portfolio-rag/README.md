@@ -313,6 +313,7 @@ Enterprise ingestion 不是启动任务，不会清空 `vector_store`。先人�
 
 详细架构、迁移和离线评估说明见：
 
+- `docs/enterprise-rag-end-to-end-flow.md`（用户调用、SSE、入库、检索、降级、回滚和验收全流程）
 - `docs/enterprise-rag-architecture.md`
 - `docs/enterprise-rag-deployment.md`
 - `eval/README.md`
