@@ -1,19 +1,40 @@
 # EnterpriseRAG 离线评估
 
-本目录不会携带 EnterpriseRAG-Bench 数据集。官方仓库将导出文档作为按 source type 组织的 `.txt` 文件发布，文件名带有 `dsid_...` 数据集文档 ID；问题集 `questions.jsonl` 使用 `question_id`、`question`、`expected_doc_ids`、`gold_answer`、`answer_facts` 等字段。
+本目录不会把 EnterpriseRAG-Bench 数据集提交进 Git。数据已经下载到本机的 `eval/data/EnterpriseRAG-Bench/`，其中包含官方 `questions.jsonl`（500 道问题）和用于本地接入验证的 `github_slice_0001.zip`（5,000 篇 GitHub 文档）。完整 `all_documents.zip` 约 1.26 GB，下载速度较慢；当前未完成部分明确保存为 `all_documents.zip.partial`，不可用于导入。
+
+官方 Hugging Face 页面是 [onyx-dot-app/EnterpriseRAG-Bench](https://huggingface.co/datasets/onyx-dot-app/EnterpriseRAG-Bench)，官方 release 和 `.txt` 导出格式见 [EnterpriseRAG-Bench GitHub repository](https://github.com/onyx-dot-app/EnterpriseRAG-Bench)。文件名带有 `dsid_...` 数据集文档 ID；问题集 `questions.jsonl` 使用 `question_id`、`question`、`expected_doc_ids`、`gold_answer`、`answer_facts` 等字段。
 
 官方来源：
 
 - [EnterpriseRAG-Bench](https://github.com/onyx-dot-app/EnterpriseRAG-Bench)
 - [Quickstart / export data format](https://github.com/onyx-dot-app/EnterpriseRAG-Bench/blob/main/quickstart.md)
 
+完整 release 下载（支持断点续传；文件约 1.26 GB）：
+
+```powershell
+curl.exe -L --retry 5 --retry-delay 5 --continue-at - --fail --show-error `
+  -o .\eval\data\EnterpriseRAG-Bench\all_documents.zip `
+  https://github.com/onyx-dot-app/EnterpriseRAG-Bench/releases/download/v1.0.0/all_documents.zip
+```
+
 ## 1. 导入开发规模数据
 
-先人工下载官方 release 的 `all_documents.zip` 或 source slice，再设置后端 `ENTERPRISE_RAG_ADMIN_TOKEN`。适配器会按 source type 轮询抽样，支持 1000、5000、10000、50000 文档，不会自动下载完整 500k+ corpus：
+先人工下载官方 release 的 `all_documents.zip` 或 source slice，再设置后端 `ENTERPRISE_RAG_ADMIN_TOKEN`。适配器会按 source type 轮询抽样，支持 1000、5000、10000、50000 文档，不会自动下载完整 500k+ corpus。
+
+先做本地读取验证，不会访问后端：
+
+```powershell
+python .\eval\import_enterprise_bench.py `
+  --archive .\eval\data\EnterpriseRAG-Bench\github_slice_0001.zip `
+  --max-documents 5000 `
+  --dry-run
+```
+
+确认后再提交 embedding 入库：
 
 ```bash
 python eval/import_enterprise_bench.py \
-  --archive ./data/EnterpriseRAG-Bench/all_documents.zip \
+  --archive ./eval/data/EnterpriseRAG-Bench/all_documents.zip \
   --max-documents 5000 \
   --api-base http://localhost:8080 \
   --admin-token "$ENTERPRISE_RAG_ADMIN_TOKEN"
@@ -23,7 +44,7 @@ Windows PowerShell：
 
 ```powershell
 python .\eval\import_enterprise_bench.py `
-  --archive .\data\EnterpriseRAG-Bench\all_documents.zip `
+  --archive .\eval\data\EnterpriseRAG-Bench\all_documents.zip `
   --max-documents 5000 `
   --api-base http://localhost:8080 `
   --admin-token $env:ENTERPRISE_RAG_ADMIN_TOKEN

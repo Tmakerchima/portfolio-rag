@@ -8,16 +8,28 @@
 
 ### 语料文件在哪里
 
-仓库不携带 EnterpriseRAG-Bench 的完整语料，也不会在应用启动时自动下载或生成企业文档。下载后的源文件应放在本地运行导入脚本的目录，例如：
+仓库不携带 EnterpriseRAG-Bench 的完整语料，也不会在应用启动时自动下载或生成企业文档。当前本机已下载官方问题集和 GitHub source slice；完整语料包仍需断点续传，未完成文件明确保存为 `all_documents.zip.partial`，不可用于导入。下载后的源文件放在本地运行导入脚本的目录，例如：
 
 ```text
 eval/data/EnterpriseRAG-Bench/all_documents.zip
+eval/data/EnterpriseRAG-Bench/questions.jsonl
+eval/data/EnterpriseRAG-Bench/github_slice_0001.zip
 eval/data/EnterpriseRAG-Bench/<source-type>/*.txt
 ```
 
 `eval/data/` 被 `.gitignore` 忽略，避免把数百 MB/GB 的数据集提交进 Git。脚本读取 `.txt` 源文件，调用 `/api/enterprise/admin/ingest`，由后端完成 normalize → chunk → embedding → PostgreSQL 写入。
 
+完整包可使用官方 release 地址断点续传：
+
+```powershell
+curl.exe -L --retry 5 --retry-delay 5 --continue-at - --fail --show-error `
+  -o .\eval\data\EnterpriseRAG-Bench\all_documents.zip `
+  https://github.com/onyx-dot-app/EnterpriseRAG-Bench/releases/download/v1.0.0/all_documents.zip
+```
+
 如果 Supabase Table Editor 搜索不到 `enterprise_documents` / `enterprise_chunks`，说明上面的 migration 尚未执行；如果表存在但行数为 0，说明 migration 已执行但导入命令尚未运行。可以先查看 `GET /api/enterprise/health`，它会分别返回 `MIGRATION_REQUIRED`、`EMPTY` 或 `READY`。
+
+在发送任何请求前，可以用导入器的 `--dry-run` 验证压缩包可读、source type 和文档数量；它不会调用后端。当前已验证 GitHub slice 可以读取 5,000 篇文档，并包含 multipart upload limits 的目标文档。
 
 ## Shared Spring Boot backend
 

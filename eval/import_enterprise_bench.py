@@ -23,11 +23,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--archive", type=Path, required=True, help="all_documents.zip, source slice zip, or extracted directory")
     parser.add_argument("--max-documents", type=int, choices=sorted(ALLOWED_SIZES), default=5000)
     parser.add_argument("--api-base", default="http://localhost:8080")
-    parser.add_argument("--admin-token", required=True)
+    parser.add_argument("--admin-token", help="ENTERPRISE_RAG_ADMIN_TOKEN; not needed with --dry-run")
     parser.add_argument("--tenant-id", default="default")
     parser.add_argument("--department", default="engineering")
     parser.add_argument("--access-level", default="public")
     parser.add_argument("--batch-size", type=int, default=25)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="read and select documents locally, but do not call the ingestion API",
+    )
     return parser.parse_args()
 
 
@@ -123,6 +128,13 @@ def main() -> int:
         document["accessLevel"] = args.access_level
     kinds = sorted({document["sourceType"] for document in documents})
     print(f"selected {len(documents)} documents across source types: {', '.join(kinds)}")
+    print(f"sample external IDs: {', '.join(document['externalId'] for document in documents[:3])}")
+    if args.dry_run:
+        print("dry-run complete; no ingestion request sent")
+        return 0
+    if not args.admin_token:
+        print("--admin-token is required unless --dry-run is used", file=sys.stderr)
+        return 2
     post_documents(args.api_base, args.admin_token, documents, args.batch_size)
     return 0
 
