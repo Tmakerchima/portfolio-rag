@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
@@ -15,6 +16,15 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class IngestServiceTest {
+
+    @Test
+    void resumeIngestServiceIsNotAnApplicationRunner() {
+        IngestService service = new IngestService(
+                mock(VectorStore.class), mock(JdbcTemplate.class),
+                mock(KnowledgeDocumentChunker.class), new KnowledgeChunkStore());
+
+        assertThat(service).isNotInstanceOf(ApplicationRunner.class);
+    }
 
     @Test
     void splitsEmbeddingRequestsIntoBatchesOfAtMostTenDocuments() {

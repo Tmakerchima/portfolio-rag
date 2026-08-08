@@ -56,7 +56,8 @@ portfolio:
 enterprise:
   rag:
     enabled: ${ENTERPRISE_RAG_ENABLED:true}
-    max-documents: ${ENTERPRISE_RAG_MAX_DOCUMENTS:5000}
+    # This is only a bounded HTTP canary guard. Full corpus loads use eval/enterprise_rag_worker.py.
+    max-documents: ${ENTERPRISE_RAG_MAX_DOCUMENTS:1000}
     max-chunk-chars: ${ENTERPRISE_RAG_MAX_CHUNK_CHARS:1600}
     vector-top-k: ${ENTERPRISE_RAG_VECTOR_TOP_K:12}
     keyword-top-k: ${ENTERPRISE_RAG_KEYWORD_TOP_K:12}
@@ -67,6 +68,13 @@ enterprise:
     strategy: ${ENTERPRISE_RAG_STRATEGY:HYBRID}
     rerank-enabled: ${ENTERPRISE_RAG_RERANK_ENABLED:true}
     admin-token: ${ENTERPRISE_RAG_ADMIN_TOKEN:}
+    vector-backend: ${ENTERPRISE_RAG_VECTOR_BACKEND:PGVECTOR}
+    active-corpus-id: ${ENTERPRISE_RAG_ACTIVE_CORPUS_ID:}
+    embedding-model: ${ENTERPRISE_RAG_EMBEDDING_MODEL:text-embedding-v3}
+    embedding-dimensions: ${ENTERPRISE_RAG_EMBEDDING_DIMENSIONS:1024}
+    worker-batch-size: ${ENTERPRISE_RAG_WORKER_BATCH_SIZE:10}
+    worker-concurrency: ${ENTERPRISE_RAG_WORKER_CONCURRENCY:1}
+    max-retries: ${ENTERPRISE_RAG_MAX_RETRIES:5}
 
 github:
   mcp-pat: ${GITHUB_MCP_PAT}

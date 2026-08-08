@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 type Locale = 'zh' | 'en'
 type Role = 'public' | 'engineering' | 'finance' | 'hr' | 'admin'
@@ -27,6 +27,26 @@ interface Metrics {
   total_ms: number
   candidate_count: number
   final_context_count: number
+  fallback?: string | null
+}
+
+interface Health {
+  status: string
+  message?: string
+  active_corpus_id?: string | null
+  dataset_version?: string
+  document_count?: number
+  expected_documents?: number
+  chunk_count?: number
+  embedded_chunk_count?: number
+  failed_count?: number
+  vector_backend?: string
+  embedding_model?: string
+  embedding_dimension?: number
+  source_distribution?: Record<string, number>
+  vector_ready?: boolean
+  fts_ready?: boolean
+  benchmark?: { status?: string }
 }
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -40,11 +60,12 @@ const metrics = ref<Metrics | null>(null)
 const error = ref('')
 const loading = ref(false)
 const expandedSource = ref<string | null>(null)
+const health = ref<Health | null>(null)
+const healthLoading = ref(false)
 
 const copy = {
   zh: {
     brand: '企业知识库',
-    backend: '共享 Spring Boot 后端',
     language: '语言',
     kicker: 'ENTERPRISE KNOWLEDGE / RAG',
     title: '让每一个答案，\n都有证据。',
@@ -53,6 +74,24 @@ const copy = {
     queryKicker: 'QUERY CONSOLE',
     queryTitle: '向知识库提问',
     live: '在线',
+    statusReady: '语料已就绪',
+    statusLoading: '检查中…',
+    statusUnavailable: '后端不可用',
+    statusMigration: '等待数据库迁移',
+    statusEmpty: '暂无 ACTIVE 语料',
+    statusIngesting: '语料导入中',
+    corpusKicker: 'CORPUS OVERVIEW',
+    corpusTitle: '当前语料状态',
+    documents: '文档',
+    expected: '目标文档',
+    chunks: '切片',
+    embedded: '已向量化',
+    failed: '失败',
+    backend: '向量后端',
+    model: 'Embedding 模型',
+    benchmark: '评估',
+    notMeasured: '尚未测量',
+    queryUnavailable: '当前 ACTIVE 语料未就绪，查询暂不可用。',
     question: '问题',
     role: '角色',
     strategy: '检索策略',
@@ -97,7 +136,6 @@ const copy = {
   },
   en: {
     brand: 'Enterprise knowledge',
-    backend: 'shared Spring Boot backend',
     language: 'Language',
     kicker: 'ENTERPRISE KNOWLEDGE / RAG',
     title: 'Every answer\nwith evidence.',
@@ -106,6 +144,24 @@ const copy = {
     queryKicker: 'QUERY CONSOLE',
     queryTitle: 'Ask the knowledge base',
     live: 'live',
+    statusReady: 'corpus ready',
+    statusLoading: 'checking…',
+    statusUnavailable: 'backend unavailable',
+    statusMigration: 'migration required',
+    statusEmpty: 'no ACTIVE corpus',
+    statusIngesting: 'ingestion in progress',
+    corpusKicker: 'CORPUS OVERVIEW',
+    corpusTitle: 'Active corpus',
+    documents: 'documents',
+    expected: 'expected',
+    chunks: 'chunks',
+    embedded: 'embedded',
+    failed: 'failed',
+    backend: 'vector backend',
+    model: 'embedding model',
+    benchmark: 'evaluation',
+    notMeasured: 'not measured yet',
+    queryUnavailable: 'The ACTIVE corpus is not ready; querying is paused.',
     question: 'Question',
     role: 'Role',
     strategy: 'Retrieval strategy',
@@ -174,6 +230,33 @@ const examples = computed(() => locale.value === 'zh'
     ])
 
 const selectedRole = computed(() => roles.value.find((item) => item.value === role.value))
+const statusKey = computed(() => {
+  if (healthLoading.value) return 'statusLoading'
+  if (!health.value) return 'statusUnavailable'
+  if (health.value.status === 'READY' || health.value.status === 'DEGRADED') return 'statusReady'
+  if (health.value.status === 'MIGRATION_REQUIRED') return 'statusMigration'
+  if (['STAGING', 'EMBEDDING', 'INGESTING', 'INDEXING', 'VALIDATING'].includes(health.value.status)) return 'statusIngesting'
+  return 'statusEmpty'
+})
+const queryReady = computed(() => health.value?.status === 'READY' || health.value?.status === 'DEGRADED')
+const statusTone = computed(() => queryReady.value ? 'ready' : 'blocked')
+const statusLabel = computed(() => t(statusKey.value as CopyKey))
+
+async function refreshHealth() {
+  if (!apiBase) return
+  healthLoading.value = true
+  try {
+    const response = await fetch(`${apiBase}/api/enterprise/health`, { headers: { Accept: 'application/json' } })
+    const payload = await response.json() as Health
+    health.value = payload
+  } catch {
+    health.value = null
+  } finally {
+    healthLoading.value = false
+  }
+}
+
+onMounted(refreshHealth)
 
 async function ask(questionOverride?: string) {
   if (questionOverride) question.value = questionOverride
@@ -182,6 +265,10 @@ async function ask(questionOverride?: string) {
 
   if (!apiBase) {
     error.value = t('missingApi')
+    return
+  }
+  if (!queryReady.value) {
+    error.value = t('queryUnavailable')
     return
   }
 
@@ -202,7 +289,14 @@ async function ask(questionOverride?: string) {
       signal: controller.signal,
     })
     if (!response.ok) {
-      if (response.status === 502 || response.status === 503) throw new Error('BACKEND_UNAVAILABLE')
+      if (response.status === 502 || response.status === 503) {
+        let message = 'BACKEND_UNAVAILABLE'
+        try {
+          const payload = await response.clone().json() as { message?: string }
+          if (payload.message) message = payload.message
+        } catch { /* keep localized fallback */ }
+        throw new Error(message)
+      }
       throw new Error(`${t('requestFailed')} (${response.status})`)
     }
     if (!response.body) throw new Error('Streaming response is unavailable')
@@ -226,7 +320,7 @@ async function ask(questionOverride?: string) {
       error.value = t('timeout')
     } else if (requestError instanceof TypeError) {
       error.value = t('networkError')
-    } else if (requestError instanceof Error && requestError.message === 'BACKEND_UNAVAILABLE') {
+    } else if (requestError instanceof Error && (requestError.message === 'BACKEND_UNAVAILABLE' || requestError.message.includes('migration'))) {
       error.value = t('backendDown')
     } else {
       error.value = requestError instanceof Error ? requestError.message : t('requestFailed')
@@ -274,7 +368,7 @@ function handleEvent(event: string) {
         </span>
       </a>
       <div class="topbar-actions">
-        <span class="status"><i /> {{ t('backend') }}</span>
+        <span class="status" :class="statusTone"><i /> {{ health?.status || t('statusUnavailable') }} · {{ statusLabel }}</span>
         <label class="language-control">
           <span>{{ t('language') }}</span>
           <select v-model="locale" aria-label="Language">
@@ -293,13 +387,35 @@ function handleEvent(event: string) {
         <p class="architecture-line">{{ t('architecture') }}</p>
       </section>
 
+      <section class="corpus-card card">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">{{ t('corpusKicker') }}</p>
+            <h2>{{ t('corpusTitle') }}</h2>
+          </div>
+          <span class="request-id">{{ health?.dataset_version || '—' }}</span>
+        </div>
+        <div v-if="health" class="corpus-grid">
+          <div><span>{{ t('documents') }}</span><strong>{{ health.document_count ?? 0 }}</strong><small>/ {{ health.expected_documents ?? 0 }}</small></div>
+          <div><span>{{ t('chunks') }}</span><strong>{{ health.chunk_count ?? 0 }}</strong></div>
+          <div><span>{{ t('embedded') }}</span><strong>{{ health.embedded_chunk_count ?? 0 }}</strong></div>
+          <div><span>{{ t('failed') }}</span><strong>{{ health.failed_count ?? 0 }}</strong></div>
+        </div>
+        <div v-else class="metric-placeholder">{{ t('statusUnavailable') }}</div>
+        <div v-if="health" class="corpus-footer">
+          <span>{{ t('backend') }}: {{ health.vector_backend || '—' }}</span>
+          <span>{{ t('model') }}: {{ health.embedding_model || '—' }}</span>
+          <span>{{ t('benchmark') }}: {{ health.benchmark?.status === 'NOT_MEASURED_YET' ? t('notMeasured') : health.benchmark?.status || t('notMeasured') }}</span>
+        </div>
+      </section>
+
       <section class="query-card card">
         <div class="section-heading">
           <div>
             <p class="eyebrow">{{ t('queryKicker') }}</p>
             <h2>{{ t('queryTitle') }}</h2>
           </div>
-          <span class="live-pill"><i /> {{ t('live') }}</span>
+          <span class="live-pill" :class="statusTone"><i /> {{ statusLabel }}</span>
         </div>
         <form @submit.prevent="ask()">
           <label for="question">{{ t('question') }}</label>
@@ -322,12 +438,13 @@ function handleEvent(event: string) {
                 <option value="HYBRID_RERANK">{{ t('rerank') }}</option>
               </select>
             </label>
-            <button type="submit" :disabled="loading || !question.trim()">
+            <button type="submit" :disabled="loading || !question.trim() || !queryReady">
               <span v-if="loading" class="spinner" />
               {{ loading ? t('retrieving') : t('run') }}
             </button>
           </div>
           <p class="selection-note">{{ selectedRole?.description }} · {{ t('aclNote') }}</p>
+          <p v-if="!queryReady" class="selection-note warning">{{ health?.message || t('queryUnavailable') }}</p>
         </form>
         <div class="examples">
           <span>{{ t('examples') }}</span>
@@ -396,6 +513,7 @@ function handleEvent(event: string) {
             <span>{{ metrics.candidate_count }} {{ t('candidates') }}</span>
             <span>{{ metrics.final_context_count }} {{ t('contextChunks') }}</span>
             <span>{{ metrics.strategy }}</span>
+            <span v-if="metrics.fallback">fallback: {{ metrics.fallback }}</span>
           </div>
         </div>
       </section>

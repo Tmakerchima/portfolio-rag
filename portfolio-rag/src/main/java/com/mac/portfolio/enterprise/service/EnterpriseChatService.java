@@ -137,6 +137,7 @@ public class EnterpriseChatService {
         metrics.put("total_ms", elapsedMs(started));
         metrics.put("candidate_count", values.candidateCount());
         metrics.put("final_context_count", values.finalContextCount());
+        metrics.put("fallback", values.fallback());
         return jsonFrame(METRICS_MARKER, metrics);
     }
 

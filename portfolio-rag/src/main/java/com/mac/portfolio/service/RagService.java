@@ -36,23 +36,30 @@ public class RagService {
             """;
 
     private final ChatClient chatClient;
-    private final HybridRetrievalService retrievalService;
+    private final ResumeContextProvider resumeContextProvider;
     private final AgentToolProvider agentToolProvider;
     private final ObjectMapper objectMapper;
 
-    public RagService(ChatClient chatClient, HybridRetrievalService retrievalService,
+    public RagService(ChatClient chatClient, ResumeContextProvider resumeContextProvider,
                       AgentToolProvider agentToolProvider,
                       ObjectMapper objectMapper) {
         this.chatClient = chatClient;
-        this.retrievalService = retrievalService;
+        this.resumeContextProvider = resumeContextProvider;
         this.agentToolProvider = agentToolProvider;
         this.objectMapper = objectMapper;
     }
 
     public Flux<String> streamAnswer(String question) {
         return Flux.defer(() -> {
-            // 只检索一次：metadata 过滤 + vector recall + 本地 lexical rerank，避免 Advisor 再次塞入一批上下文。
-            List<Document> documents = retrievalService.retrieve(question);
+            // about-mac.md is intentionally small and authoritative for static resume facts.
+            // Pass the complete file; do not query or mutate the legacy vector_store.
+            Document document = Document.builder()
+                    .id("resume-about-mac")
+                    .text(resumeContextProvider.content())
+                    .metadata(Map.of("source", "about-mac.md", "context_mode", "full"))
+                    .score(1.0)
+                    .build();
+            List<Document> documents = List.of(document);
             String sourcesFrame = toSourcesFrame(documents);
 
             // 本轮请求专属的容器：哪些工具被实际调用，由 ToolUsageTrackingCallback 在执行时写入

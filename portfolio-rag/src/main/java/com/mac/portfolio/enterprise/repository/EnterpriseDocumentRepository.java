@@ -14,9 +14,12 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public class EnterpriseDocumentRepository {
+
+    public static final UUID LEGACY_CORPUS_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     private static final String ACL_FILTER = """
             AND (? = 'admin' OR d.access_level = 'public' OR d.department = ?)
@@ -35,24 +38,24 @@ public class EnterpriseDocumentRepository {
         List<EnterpriseDocumentRecord> rows = jdbcTemplate.query("""
                 SELECT document_id, external_id, source, content_hash, version, deleted_at
                 FROM enterprise_documents
-                WHERE source = ? AND external_id = ?
+                WHERE corpus_id = ? AND source = ? AND external_id = ?
                 """, (rs, rowNum) -> new EnterpriseDocumentRecord(
                 rs.getString("document_id"),
                 rs.getString("external_id"),
                 rs.getString("source"),
                 rs.getString("content_hash"),
                 rs.getInt("version"),
-                rs.getTimestamp("deleted_at") != null), source, externalId);
+                rs.getTimestamp("deleted_at") != null), LEGACY_CORPUS_ID, source, externalId);
         return rows.stream().findFirst();
     }
 
     public void upsertDocument(EnterpriseDocumentInput input, String documentId, String contentHash, int version) {
         jdbcTemplate.update("""
                 INSERT INTO enterprise_documents
-                    (document_id, external_id, source, source_type, title, content, content_hash,
+                    (corpus_id, document_id, external_id, source, source_type, title, content, content_hash,
                      version, tenant_id, department, access_level, metadata, updated_at, indexed_at, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, now(), now(), NULL)
-                ON CONFLICT (source, external_id) DO UPDATE SET
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, now(), now(), NULL)
+                ON CONFLICT (corpus_id, source, external_id) DO UPDATE SET
                     document_id = EXCLUDED.document_id,
                     source_type = EXCLUDED.source_type,
                     title = EXCLUDED.title,
@@ -66,7 +69,7 @@ public class EnterpriseDocumentRepository {
                     updated_at = now(),
                     indexed_at = now(),
                     deleted_at = NULL
-                """, documentId, input.externalId(), input.source(), input.sourceType(), input.title(), input.content(),
+                """, LEGACY_CORPUS_ID, documentId, input.externalId(), input.source(), input.sourceType(), input.title(), input.content(),
                 contentHash, version, input.tenantId(), input.department(), input.accessLevel(), toJson(input.metadata()));
     }
 
@@ -78,10 +81,10 @@ public class EnterpriseDocumentRepository {
                             Map<String, Object> metadata, float[] embedding) {
         jdbcTemplate.update("""
                 INSERT INTO enterprise_chunks
-                    (chunk_id, document_id, chunk_index, content, content_hash, token_count,
+                    (corpus_id, chunk_id, document_id, chunk_index, content, content_hash, token_count,
                      metadata, embedding, search_vector)
-                VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::vector, to_tsvector('simple', ?))
-                """, chunk.chunkId(), documentId, chunk.index(), chunk.content(), contentHash,
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::vector, to_tsvector('simple', ?))
+                """, LEGACY_CORPUS_ID, chunk.chunkId(), documentId, chunk.index(), chunk.content(), contentHash,
                 estimateTokenCount(chunk.content()), toJson(metadata), vectorLiteral(embedding), chunk.content());
     }
 
@@ -105,6 +108,8 @@ public class EnterpriseDocumentRepository {
                 JOIN enterprise_documents d ON d.document_id = c.document_id
                 CROSS JOIN query_text
                 WHERE d.deleted_at IS NULL
+                  AND d.corpus_id = (SELECT corpus_id FROM enterprise_corpora
+                                     WHERE state = 'ACTIVE' LIMIT 1)
                   AND c.search_vector @@ query_text.query
                 """ + ACL_FILTER + """
                 ORDER BY score DESC, c.chunk_id
@@ -129,6 +134,8 @@ public class EnterpriseDocumentRepository {
                 JOIN enterprise_documents d ON d.document_id = c.document_id
                 CROSS JOIN query_embedding
                 WHERE d.deleted_at IS NULL
+                  AND d.corpus_id = (SELECT corpus_id FROM enterprise_corpora
+                                     WHERE state = 'ACTIVE' LIMIT 1)
                   AND c.embedding IS NOT NULL
                   AND 1 - (c.embedding <=> query_embedding.embedding) >= ?
                 """ + ACL_FILTER + """
