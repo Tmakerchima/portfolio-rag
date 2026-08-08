@@ -19,6 +19,34 @@
 
 旧的个人简历 `about-mac.md` 使用原有 `vector_store`；EnterpriseRAG 使用独立的 `enterprise_documents` 和 `enterprise_chunks`，两条链路互不清空或覆盖。
 
+## 0.1 Railway redeploy、重启和重新索引不是一回事
+
+```mermaid
+flowchart TD
+    A[Railway redeploy / JVM restart] --> B[Spring Boot 启动]
+    B --> C[加载 ChatClient、EmbeddingModel、Repository]
+    C --> D[读取现有 ACTIVE corpus]
+    D --> E[继续提供 health/chat]
+    D -. 不启动 worker .-> F[不重新读取 5000 文档]
+    D -. 不调用 embedding .-> G[Enterprise embedding API 次数 = 0]
+
+    H[手动执行 enterprise_rag_worker.py] --> I{--resume + content hash}
+    I -->|DONE 且 hash 未变| J[跳过该文档]
+    I -->|新文档或 hash 变化| K[重新 chunk + embedding]
+    K --> L[STAGING corpus]
+    L --> M[计数 gate]
+    M --> N[显式 activate / rollback]
+```
+
+当前代码中，EnterpriseRAG 不会在应用启动时导入；`about-mac.md` 的 legacy `IngestService` 也只保留手动批量 helper，不会因 redeploy 自动执行。因此：
+
+- 只 redeploy Railway：EnterpriseRAG 不重新 chunk，embedding API 调用为 0。
+- 只重启 Spring Boot：同样不会重新 chunk，Supabase 中的 ACTIVE corpus 保持不变。
+- 手动运行 worker 且不使用有效 checkpoint：会把指定范围当作一次新索引任务。
+- 手动运行 worker 并使用 `--resume`：相同 `external_id + content_hash` 跳过，只处理新增或变更文档。
+
+如果修改了 chunk size、overlap、embedding model 或 embedding dimension，应视为新的索引版本，创建新的 corpus；不能把不同向量空间混在同一 active corpus 中。
+
 ## 1. 用户调用流程
 
 ```mermaid
@@ -184,6 +212,74 @@ worker 不调用受限的 HTTP canary ingestion，而是直接使用受控数据
 | `enterprise_documents` | 原始文本、source、title、tenant、department、access level |
 | `enterprise_chunks` | 切片文本、chunk index、metadata、embedding、FTS search vector |
 | `vector_store` | 旧的个人简历 RAG，EnterpriseRAG 不使用 |
+
+## 2.3 API 调用次数和费用估算
+
+### 5,000 documents 的本次导入
+
+本次 dry-run 统计：
+
+| 项目 | 数值 |
+|---|---:|
+| documents | 5,000 |
+| chunks | 15,816 |
+| embedding 文本字符数（含 contextual prefix） | 27,328,763 |
+| 估算输入 tokens（按 0.3 token/字符） | 约 8,198,629 |
+| 当前 worker embedding HTTP 请求数 | 5,000 |
+
+虽然 DashScope 单次最多接收 10 条文本，但当前 worker 在每个 document 内分批，保证单文档事务和断点语义；本批每篇文档最多 8 chunks，因此每篇恰好 1 次 embedding 请求。若将来改为跨文档全局 batching，理论请求数可接近 `ceil(15816 / 10) = 1582`，但需要重新设计事务、失败重试和文档级 checkpoint。
+
+DashScope 官方价格表中，`text-embedding-v3` 为约 ¥0.0005 / 1K input tokens；Batch API 价格约为 ¥0.00025 / 1K tokens。[官方 Embedding 价格](https://help.aliyun.com/en/model-studio/embedding) 当前 worker 使用同步 OpenAI-compatible API，因此按同步价格粗估：
+
+```text
+8,198,629 / 1,000 × ¥0.0005 ≈ ¥4.10
+```
+
+如果改用 DashScope Batch API，理论 embedding 成本约 ¥2.05；实际账单以 provider 返回的 token usage、地域和优惠为准。此前出现的 `Arrearage` 是账户状态问题，不代表这批 embedding 本身需要高额费用。
+
+### 每次用户问答
+
+```mermaid
+flowchart LR
+    Q[用户问题] --> S{strategy}
+    S -->|KEYWORD| FTS[PostgreSQL FTS]
+    S -->|VECTOR| E[1 次 query embedding]
+    S -->|HYBRID| E
+    S -->|HYBRID_RERANK| E
+    E --> V[PGVector]
+    FTS --> R[RRF / context limit]
+    V --> R
+    R --> L[1 次 qwen-plus streaming request]
+    L --> O[SSE answer + sources + metrics]
+```
+
+当前每次问答的上游 API 次数：
+
+| 请求模式 | DashScope embedding | DashScope LLM | 额外 reranker API |
+|---|---:|---:|---:|
+| `KEYWORD` | 0 | 1 | 0 |
+| `VECTOR` | 1 | 1 | 0 |
+| `HYBRID` | 1 | 1 | 0 |
+| `HYBRID_RERANK` | 1 | 1 | 0（当前是 `NoOpReranker`） |
+
+LLM 是一次 HTTP streaming 请求，不是每个 token 调用一次 API；PostgreSQL 的 FTS、pgvector、RRF 都是数据库/Java 内部操作，不另收费。当前 `HYBRID` 是前端默认策略，所以一次用户提问通常是：
+
+```text
+1 次 query embedding + 1 次 qwen-plus 生成 = 2 次 DashScope HTTP 请求
+```
+
+用户问答成本取决于实际 token usage：
+
+```text
+单次成本 ≈
+  query_embedding_tokens / 1,000 × embedding_price
+  + LLM_input_tokens / 1,000,000 × qwen_input_price
+  + LLM_output_tokens / 1,000,000 × qwen_output_price
+```
+
+当前 LLM 配置是 `qwen-plus`；阿里云价格会按具体 model version、地域、输入上下文、输出长度和优惠变化，应以控制台和官方价格表为准。[Model Studio 模型价格](https://help.aliyun.com/en/model-studio/model-pricing)
+
+以当前 `max-context-chars=9000`、一般 2,000～3,000 input tokens、200～500 output tokens 的问答作粗估，embedding 查询本身通常低于 ¥0.00001，LLM 约为几厘人民币级别；长上下文、长回答或切换更高阶模型会增加成本。最准确的做法是记录响应中的 `usage`，并把 input/output tokens 乘以控制台当前单价。
 
 ## 3. 在线 RAG 检索流程
 
