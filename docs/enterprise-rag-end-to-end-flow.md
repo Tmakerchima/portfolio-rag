@@ -17,7 +17,7 @@
 | database | Supabase PostgreSQL + pgvector |
 | source | `EnterpriseRAG-Bench/github_slice_0001.zip` |
 
-旧的个人简历 `about-mac.md` 使用原有 `vector_store`；EnterpriseRAG 使用独立的 `enterprise_documents` 和 `enterprise_chunks`，两条链路互不清空或覆盖。
+个人简历 `about-mac.md` 由 `ResumeContextProvider` 一次性读取并作为完整上下文，不查询 `vector_store`；EnterpriseRAG 使用独立的 `enterprise_documents` 和 `enterprise_chunks`。
 
 ## 0.1 Railway redeploy、重启和重新索引不是一回事
 
@@ -211,7 +211,7 @@ worker 不调用受限的 HTTP canary ingestion，而是直接使用受控数据
 | `enterprise_ingestion_jobs` | 导入 job、checkpoint cursor、处理数量、失败码 |
 | `enterprise_documents` | 原始文本、source、title、tenant、department、access level |
 | `enterprise_chunks` | 切片文本、chunk index、metadata、embedding、FTS search vector |
-| `vector_store` | 旧的个人简历 RAG，EnterpriseRAG 不使用 |
+| `vector_store` | 遗留简历向量投影；当前在线简历和 EnterpriseRAG 都不使用 |
 
 ## 2.3 API 调用次数和费用估算
 

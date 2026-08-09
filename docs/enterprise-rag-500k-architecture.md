@@ -48,4 +48,4 @@ The V2 migration is additive and leaves the legacy `public.vector_store` untouch
 
 ## Resume full-context path
 
-`ResumeContextProvider` loads `classpath:knowledge/about-mac.md`, validates UTF-8/non-empty/size, and `RagService` sends the complete text inside `<retrieved_context>`. The markdown is untrusted data: its contents cannot override system/developer instructions or request secrets/tools.
+`ResumeContextProvider` loads `classpath:knowledge/about-mac.md`, validates UTF-8/non-empty/size, and `RagService` sends the complete text inside `<resume_context>`. The markdown is untrusted data: its contents cannot override system/developer instructions or request secrets/tools.

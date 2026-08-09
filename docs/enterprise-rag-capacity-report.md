@@ -6,7 +6,7 @@ Status: **BLOCKED_BY_SUPABASE_CAPACITY until a paid capacity/budget gate is appr
 
 - The current Supabase project is on the Free tier from the supplied dashboard screenshot.
 - The online API previously returned `MIGRATION_REQUIRED`, `documents=0`, `chunks=0`.
-- The visible `public.vector_store` contains the legacy Resume projection, not EnterpriseRAG-Bench.
+- The visible `public.vector_store` contains a legacy Resume projection, not EnterpriseRAG-Bench; the current Resume request path no longer queries it.
 - The complete archive must be downloaded and verified before any production load. The local `.partial`/range files are not valid input.
 
 ## Estimate
