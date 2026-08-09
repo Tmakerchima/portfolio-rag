@@ -1,3 +1,4 @@
 # Offline evaluation only. These dependencies are never loaded by the Spring Boot runtime.
 ragas>=0.3
 datasets>=2.18
+psycopg[binary]>=3.2

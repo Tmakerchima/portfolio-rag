@@ -108,9 +108,11 @@
 
 ### 7. Portfolio RAG 简历 AI Agent（2026，个人，已上线并开源）
 
-设计并开发当前个人网站的智能问答系统。前端使用 Vue 3 + TypeScript，通过 SSE 展示流式回答；后端使用 **Java 21、Spring Boot、Spring AI 和 WebFlux** 编排多种能力：从 Supabase PGVector 检索简历片段，通过 Function Calling 查询博客动态，并通过 GitHub 官方远程 MCP Server 查询仓库、Issue 与 PR 等实时信息。系统会在前端标记每轮回答实际使用了 RAG、Function Calling 还是 MCP，GitHub MCP 不可用时会容错降级，避免拖垮主问答链路。
+设计并开发当前个人网站的智能问答系统。前端使用 Vue 3 + TypeScript，通过 SSE 展示流式回答；后端使用 **Java 21、Spring Boot、Spring AI 和 WebFlux** 编排多种能力：静态简历问答直接向 LLM 提供完整的 `about-mac.md` 上下文，不执行向量检索；动态信息通过 Function Calling 查询博客，并通过 GitHub 官方远程 MCP Server 查询仓库、Issue 与 PR 等实时信息。系统会在前端标记实际调用的 Function Calling 或 MCP 工具，GitHub MCP 不可用时会容错降级，避免拖垮主问答链路。
 
-部署链路为：前端 Vercel（https://tmakerchima.cn）、后端 Railway、向量数据库 Supabase PostgreSQL + pgvector。代码地址：https://github.com/Tmakerchima/portfolio-rag
+同一仓库还包含独立的 EnterpriseRAG 企业知识库演示：5,000 篇 EnterpriseRAG-Bench 文档被切成 15,816 个 chunks，存储在 Supabase PostgreSQL + pgvector，并通过向量检索、全文检索和 RRF 融合召回。个人简历问答与企业知识库使用不同的数据链路。
+
+部署链路为：前端 Vercel（https://tmakerchima.cn）、后端 Railway、企业语料数据库 Supabase PostgreSQL + pgvector。代码地址：https://github.com/Tmakerchima/portfolio-rag
 
 技术栈：Java 21、Spring Boot、Spring AI、WebFlux、RAG、PGVector、Function Calling、MCP、Vue 3、TypeScript、Vercel、Railway、Supabase
 

@@ -60,6 +60,9 @@ public class EnterpriseRetrievalService {
         String safeQuery = query == null ? "" : query.trim();
         List<EnterpriseSearchHit> vectorHits = List.of();
         List<EnterpriseSearchHit> keywordHits = List.of();
+        boolean vectorFailed = false;
+        boolean keywordFailed = false;
+        boolean rerankerFailed = false;
         long vectorMs = 0;
         long ftsMs = 0;
 
@@ -70,6 +73,7 @@ public class EnterpriseRetrievalService {
                 vectorHits = repository.searchVector(embeddingModel.embed(safeQuery), access, vectorTopK,
                         similarityThreshold);
             } catch (Exception e) {
+                vectorFailed = true;
                 log.warn("Enterprise vector retrieval failed; continuing with keyword fallback: {}", e.getMessage());
             } finally {
                 vectorMs = elapsedMs(started);
@@ -82,6 +86,7 @@ public class EnterpriseRetrievalService {
             try {
                 keywordHits = repository.searchKeyword(safeQuery, access, keywordTopK);
             } catch (Exception e) {
+                keywordFailed = true;
                 log.warn("Enterprise FTS retrieval failed; continuing with vector fallback: {}", e.getMessage());
             } finally {
                 ftsMs = elapsedMs(started);
@@ -100,6 +105,7 @@ public class EnterpriseRetrievalService {
             try {
                 candidates = reranker.rerank(safeQuery, candidates);
             } catch (Exception e) {
+                rerankerFailed = true;
                 log.warn("Enterprise reranker failed; using RRF result: {}", e.getMessage());
             }
         }
@@ -108,7 +114,16 @@ public class EnterpriseRetrievalService {
         List<EnterpriseSearchHit> finalHits = limitContext(candidates);
         return new EnterpriseRetrievalResult(finalHits, strategy,
                 new EnterpriseRetrievalMetrics(vectorMs, ftsMs, rrfMs, rerankMs,
-                        distinctCount(vectorHits, keywordHits), finalHits.size()));
+                        distinctCount(vectorHits, keywordHits), finalHits.size(),
+                        fallback(vectorFailed, keywordFailed, rerankerFailed)));
+    }
+
+    private String fallback(boolean vectorFailed, boolean keywordFailed, boolean rerankerFailed) {
+        if (vectorFailed && keywordFailed) return "EVIDENCE_ONLY";
+        if (vectorFailed) return "FTS_ONLY";
+        if (keywordFailed) return "VECTOR_ONLY";
+        if (rerankerFailed) return "RRF";
+        return null;
     }
 
     private List<EnterpriseSearchHit> limitContext(List<EnterpriseSearchHit> candidates) {

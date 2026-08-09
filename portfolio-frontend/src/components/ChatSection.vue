@@ -3,25 +3,18 @@ import { ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
 
-interface Source {
-  source: string
-  snippet: string
-  score: number
-}
-
 interface ToolUsage {
   origin: string
   name: string
 }
 
-const SOURCES_MARKER = '@@SOURCES@@'
+// Ignore source frames from an older backend during a rolling deployment.
+const LEGACY_SOURCES_MARKER = '@@SOURCES@@'
 const TOOLS_MARKER = '@@TOOLS@@'
 
 const question = ref('')
 const answer = ref('')
 const loading = ref(false)
-const sourcesOpen = ref(false)
-const sources = ref<Source[]>([])
 const toolsUsed = ref<ToolUsage[]>([])
 
 const presets = [
@@ -37,8 +30,6 @@ async function ask(q?: string) {
   question.value = text
   answer.value = ''
   loading.value = true
-  sourcesOpen.value = false
-  sources.value = []
   toolsUsed.value = []
 
   try {
@@ -62,12 +53,7 @@ async function ask(q?: string) {
         .join('\n')
       if (!content) return
 
-      if (content.startsWith(SOURCES_MARKER)) {
-        try {
-          sources.value = JSON.parse(content.slice(SOURCES_MARKER.length))
-        } catch {
-          sources.value = []
-        }
+      if (content.startsWith(LEGACY_SOURCES_MARKER)) {
         return
       }
 
@@ -119,7 +105,7 @@ async function ask(q?: string) {
         Ask anything
       </h2>
       <p class="mb-10 text-sm leading-relaxed text-[#777777] dark:text-[#999999]">
-        这是一个可调用 RAG、Function Calling 与 GitHub MCP 的简历 AI Agent。
+        这是一个使用完整简历上下文，并可调用 Function Calling 与 GitHub MCP 的简历 AI Agent。
       </p>
 
       <!-- 预设问题胶囊 -->
@@ -171,14 +157,8 @@ async function ask(q?: string) {
       <div v-if="answer" class="mt-10">
         <div class="text-[#111111] dark:text-[#f5f5f5] text-base leading-relaxed whitespace-pre-wrap">{{ answer }}</div>
 
-        <!-- 本轮回答用到的能力：RAG 检索 / Function Calling / MCP -->
-        <div v-if="sources.length || toolsUsed.length" class="mt-4 flex flex-wrap gap-2">
-          <span
-            v-if="sources.length"
-            class="text-xs px-2 py-1 border border-[#dddddd] dark:border-[#333333] text-[#666666] dark:text-[#999999]"
-          >
-            🔍 RAG 检索
-          </span>
+        <!-- 只展示本轮实际调用的动态工具。 -->
+        <div v-if="toolsUsed.length" class="mt-4 flex flex-wrap gap-2">
           <span
             v-for="(t, i) in toolsUsed"
             :key="i"
@@ -188,30 +168,6 @@ async function ask(q?: string) {
           </span>
         </div>
 
-        <!-- 可折叠 Sources 面板 -->
-        <div v-if="sources.length" class="mt-8 border-t border-[#eeeeee] dark:border-[#222222] pt-4">
-          <button
-            @click="sourcesOpen = !sourcesOpen"
-            class="text-sm text-[#999999] hover:text-[#0C447C] dark:hover:text-[#5499E0]
-                   transition-colors duration-200 flex items-center gap-2"
-          >
-            <span>{{ sourcesOpen ? '▾' : '▸' }}</span>
-            Sources（基于 {{ sources.length }} 个简历片段回答）
-          </button>
-          <ul v-if="sourcesOpen" class="mt-3 flex flex-col gap-3">
-            <li
-              v-for="(s, i) in sources"
-              :key="i"
-              class="text-sm border border-[#eeeeee] dark:border-[#222222] p-3"
-            >
-              <div class="flex justify-between items-baseline mb-1">
-                <span class="font-bold text-[#0C447C] dark:text-[#5499E0]">{{ s.source }}</span>
-                <span class="text-xs text-[#999999]">相似度 {{ (s.score * 100).toFixed(0) }}%</span>
-              </div>
-              <p class="text-[#666666] dark:text-[#888888] leading-relaxed">{{ s.snippet }}</p>
-            </li>
-          </ul>
-        </div>
       </div>
 
     </div>

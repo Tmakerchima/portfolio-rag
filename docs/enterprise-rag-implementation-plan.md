@@ -2,8 +2,8 @@
 
 ## 现有架构
 
-- `portfolio-rag` 是唯一 Spring Boot 后端，`/api/chat` 负责 Resume RAG 的 SSE 流式问答。
-- Resume 知识库由启动时的 `IngestService` 写入 Spring AI 的 `vector_store`，小语料由 `HybridRetrievalService` 使用全量上下文。
+- `portfolio-rag` 是唯一 Spring Boot 后端，`/api/chat` 负责简历 Agent 的 SSE 流式问答。
+- Resume 由 `ResumeContextProvider` 读取完整 `about-mac.md`；当前不执行向量入库或在线检索。
 - `portfolio-frontend` 是现有 Portfolio Vue 3 应用，Portfolio 与 EnterpriseRAG 共用后端但使用独立前端入口。
 
 ## 可复用组件与边界
@@ -27,7 +27,7 @@
 ## API 与前端
 
 - 新增受保护的 `POST /api/enterprise/admin/ingest`（token 未配置时拒绝）和独立的 `POST /api/enterprise/chat` SSE 接口。
-- Enterprise SSE 使用 `@@SOURCES@@`、正文、`@@METRICS@@`、`@@ERROR@@` 专属帧，不修改 Resume 的 `@@SOURCES@@` / `@@TOOLS@@` 解析。
+- Enterprise SSE 使用 `@@SOURCES@@`、正文、`@@METRICS@@`、`@@ERROR@@` 专属帧；Resume 只使用正文和 `@@TOOLS@@`。
 - 新增 `enterprise-rag-frontend`，通过 `VITE_API_BASE_URL` 配置后端地址，展示角色、策略、回答、来源与延迟指标。
 
 ## 数据集与评估
