@@ -9,6 +9,12 @@
 - [EnterpriseRAG-Bench](https://github.com/onyx-dot-app/EnterpriseRAG-Bench)
 - [Quickstart / export data format](https://github.com/onyx-dot-app/EnterpriseRAG-Bench/blob/main/quickstart.md)
 
+安装离线 worker 与评测依赖：
+
+```powershell
+python -m pip install -r .\eval\requirements.txt
+```
+
 完整 release 下载（支持断点续传；文件约 1.26 GB）：
 
 ```powershell

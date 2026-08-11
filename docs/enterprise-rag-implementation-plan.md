@@ -20,8 +20,10 @@
 ## 数据库、入库与检索设计
 
 - 新增 additive migration：文档元数据、chunk、`vector(1024)`、`tsvector`/GIN、ACL 索引。
-- 入库流程为 normalize → SHA-256 → unchanged skip / changed re-index → semantic chunk → batched embedding → transaction 写入。
-- 查询支持 VECTOR、KEYWORD、HYBRID、HYBRID_RERANK；向量和 FTS 结果用 RRF 融合，reranker 默认 NoOp，失败回退 RRF。
+- 入库流程为 normalize → SHA-256 → unchanged skip / changed re-index → Token/结构感知 chunk → 可选 LLM contextual prefix → batched embedding → transaction 写入。
+- `content` 保存可引用原文；`contextual_prefix` 是生成的检索辅助文本；`index_content` 才用于 embedding 与 FTS。
+- 查询支持 VECTOR、KEYWORD、HYBRID、HYBRID_RERANK；向量和 FTS 结果用 RRF 融合，reranker 默认 HEURISTIC、可显式切到 LLM，失败回退 RRF。
+- 可选 query planner 仅生成二次查询文本；每次二次检索复用相同的后端 ACL context，不能修改 role/tenant/department。
 - `tenant_id`、`department`、`access_level` 在 SQL where 条件中应用，demo role 支持 public / engineering / finance / hr / admin。
 
 ## API 与前端

@@ -69,6 +69,27 @@ class EnterpriseRetrievalServiceTest {
         assertThat(result.hits()).singleElement().extracting(EnterpriseSearchHit::content).isEqualTo("rrf candidate");
     }
 
+    @Test
+    void rewrittenQueriesReuseTheExactSameAccessContext() {
+        EnterpriseDocumentRepository repository = mock(EnterpriseDocumentRepository.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        EnterpriseAccessContext access = EnterpriseAccessContext.from("finance", "tenant-a");
+        when(repository.searchKeyword("original", access, 12)).thenReturn(List.of(hit("initial", "initial evidence")));
+        when(repository.searchKeyword("exact billing term", access, 12)).thenReturn(List.of(hit("expanded", "billing evidence")));
+        EnterpriseRetrievalService service = service(repository, embeddingModel, new NoOpReranker());
+
+        EnterpriseRetrievalResult initial = service.retrieve(
+                "original", access, EnterpriseRetrievalStrategy.KEYWORD);
+        EnterpriseRetrievalResult expanded = service.expand(initial, "original", List.of("exact billing term"),
+                access, EnterpriseRetrievalStrategy.KEYWORD);
+
+        assertThat(expanded.hits()).extracting(EnterpriseSearchHit::chunkId)
+                .containsExactlyInAnyOrder("initial", "expanded");
+        assertThat(expanded.metrics().queryCount()).isEqualTo(2);
+        verify(repository).searchKeyword("original", access, 12);
+        verify(repository).searchKeyword("exact billing term", access, 12);
+    }
+
     private EnterpriseRetrievalService service(EnterpriseDocumentRepository repository,
                                                EmbeddingModel embeddingModel,
                                                Reranker reranker) {

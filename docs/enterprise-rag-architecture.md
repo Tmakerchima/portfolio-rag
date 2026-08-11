@@ -15,8 +15,11 @@ flowchart LR
     A --> F[PostgreSQL FTS GIN]
     V --> R[RRF]
     F --> R
-    R --> Q[Optional NoOp / reranker]
-    Q --> C[Authorized context]
+    R --> Q[HEURISTIC or LLM reranker]
+    Q --> J{Optional query planner}
+    J -->|rewrite, same ACL| V
+    J -->|rewrite, same ACL| F
+    J --> C[Authorized context]
     C --> L[Grounded LLM]
     L --> O[SSE answer + sources + metrics]
 ```
@@ -31,8 +34,10 @@ flowchart TD
     N --> H[SHA-256 content hash]
     H --> X{Change detection}
     X -->|unchanged| S[Skip embedding]
-    X -->|new or changed| K[Semantic paragraph chunks]
-    K --> E[Batch embedding]
+    X -->|new or changed| K[Token + structure-aware chunks]
+    K --> C[Optional contextual prefix]
+    C --> S[Separate original / index content]
+    S --> E[Batch embedding]
     E --> P[(enterprise_documents + enterprise_chunks)]
     P --> G[GIN + HNSW indexes]
 ```

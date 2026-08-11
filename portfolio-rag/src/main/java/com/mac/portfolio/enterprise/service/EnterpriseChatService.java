@@ -9,6 +9,7 @@ import com.mac.portfolio.enterprise.model.EnterpriseSearchHit;
 import com.mac.portfolio.enterprise.retrieval.EnterpriseRetrievalMetrics;
 import com.mac.portfolio.enterprise.retrieval.EnterpriseRetrievalResult;
 import com.mac.portfolio.enterprise.retrieval.EnterpriseRetrievalService;
+import com.mac.portfolio.enterprise.retrieval.EnterpriseQueryPlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -39,17 +40,20 @@ public class EnterpriseChatService {
 
     private final ChatClient chatClient;
     private final EnterpriseRetrievalService retrievalService;
+    private final EnterpriseQueryPlanner queryPlanner;
     private final ObjectMapper objectMapper;
     private final EnterpriseRetrievalStrategy defaultStrategy;
     private final boolean enabled;
 
     public EnterpriseChatService(ChatClient chatClient,
                                  EnterpriseRetrievalService retrievalService,
+                                 EnterpriseQueryPlanner queryPlanner,
                                  ObjectMapper objectMapper,
                                  @Value("${enterprise.rag.strategy:HYBRID}") String defaultStrategy,
                                  @Value("${enterprise.rag.enabled:true}") boolean enabled) {
         this.chatClient = chatClient;
         this.retrievalService = retrievalService;
+        this.queryPlanner = queryPlanner;
         this.objectMapper = objectMapper;
         this.defaultStrategy = EnterpriseRetrievalStrategy.parse(defaultStrategy, EnterpriseRetrievalStrategy.HYBRID);
         this.enabled = enabled;
@@ -67,7 +71,10 @@ public class EnterpriseChatService {
             EnterpriseAccessContext access = EnterpriseAccessContext.from(
                     request.role(), request.tenantId());
             EnterpriseRetrievalStrategy strategy = EnterpriseRetrievalStrategy.parse(request.strategy(), defaultStrategy);
-            EnterpriseRetrievalResult retrieval = retrievalService.retrieve(question, access, strategy);
+            EnterpriseRetrievalResult initialRetrieval = retrievalService.retrieve(question, access, strategy);
+            List<String> rewrittenQueries = queryPlanner.plan(question, initialRetrieval.hits());
+            EnterpriseRetrievalResult retrieval = retrievalService.expand(
+                    initialRetrieval, question, rewrittenQueries, access, strategy);
             String sourcesFrame = sourcesFrame(requestId, retrieval);
             String groundedPrompt = groundedPrompt(question, access, retrieval.hits());
 
@@ -81,10 +88,10 @@ public class EnterpriseChatService {
             return Flux.concat(Mono.just(sourcesFrame), answer, metrics)
                     .doOnComplete(() -> log.info(
                             "enterprise_request request_id={} strategy={} vector_latency={}ms fts_latency={}ms " +
-                                    "rerank_latency={}ms candidate_count={} context_count={} total_latency={}ms",
+                                    "rerank_latency={}ms candidate_count={} context_count={} query_count={} total_latency={}ms",
                             requestId, strategy, retrieval.metrics().vectorMs(), retrieval.metrics().ftsMs(),
                             retrieval.metrics().rerankMs(), retrieval.metrics().candidateCount(),
-                            retrieval.metrics().finalContextCount(), elapsedMs(started)));
+                            retrieval.metrics().finalContextCount(), retrieval.metrics().queryCount(), elapsedMs(started)));
         }).onErrorResume(error -> Flux.just(errorFrame("unknown", "Enterprise request failed")))
                 .subscribeOn(Schedulers.boundedElastic());
     }
@@ -137,6 +144,7 @@ public class EnterpriseChatService {
         metrics.put("total_ms", elapsedMs(started));
         metrics.put("candidate_count", values.candidateCount());
         metrics.put("final_context_count", values.finalContextCount());
+        metrics.put("query_count", values.queryCount());
         metrics.put("fallback", values.fallback());
         return jsonFrame(METRICS_MARKER, metrics);
     }
