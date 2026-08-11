@@ -4,7 +4,7 @@
 -- ICU 对中文、英文、错误码和技术文档的 Unicode 边界更稳妥；不要把 prefix 当 citation。
 CREATE INDEX IF NOT EXISTS enterprise_chunks_index_content_paradedb_idx
 ON enterprise_chunks
-USING paradedb (
+USING bm25 (
     (chunk_id::pdb.literal),
     (index_content::pdb.icu),
     corpus_id,

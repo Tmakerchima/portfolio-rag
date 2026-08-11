@@ -1,0 +1,59 @@
+name: Enterprise BM25
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: portfolio-rag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Run unit tests
+        run: mvn -B clean test
+
+  paradedb-integration:
+    runs-on: ubuntu-latest
+    services:
+      paradedb:
+        # 与本地 compose 固定同一版本；0.24.3 使用 USING bm25。
+        image: paradedb/paradedb:0.24.3-pg16
+        env:
+          POSTGRES_DB: enterprise_search
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d enterprise_search"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: portfolio-rag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Run real ParadeDB BM25 integration test
+        env:
+          ENTERPRISE_BM25_INTEGRATION: "true"
+          ENTERPRISE_RAG_BM25_URL: jdbc:postgresql://localhost:5433/enterprise_search
+          ENTERPRISE_RAG_BM25_USERNAME: postgres
+          ENTERPRISE_RAG_BM25_PASSWORD: postgres
+        run: mvn -B -Dtest=ParadeDbBm25IntegrationTest test

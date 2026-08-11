@@ -20,11 +20,23 @@ contextual_prefix（仅 retrieval） + original content（唯一可引用证据�
 
 ## 本地验证
 
-1. 在 `portfolio-rag/` 执行 `docker compose -f docker-compose.paradedb.yml up -d`。
-2. 在 ParadeDB 中先应用与主库一致的 `enterprise_*` schema（可用 Flyway migration 或受控的 schema-only dump）。
-3. 按顺序执行 `03_paradedb_bm25_index.sql`、`04_smoke_test.sql`。
-4. 设置 `ENTERPRISE_RAG_LEXICAL_BACKEND=PARADEDB_BM25`、`ENTERPRISE_RAG_BM25_URL=jdbc:postgresql://localhost:5433/enterprise_search` 等变量后启动应用。
+1. 在仓库根目录执行 `docker compose -f .\portfolio-rag\docker-compose.paradedb.yml up -d`。
+2. 运行真实 fixture integration test（它会建表、建 `USING bm25` index、执行 `pdb.score()` 并清理 fixture）：
+
+```powershell
+$env:ENTERPRISE_BM25_INTEGRATION="true"
+$env:ENTERPRISE_RAG_BM25_URL="jdbc:postgresql://localhost:5433/enterprise_search"
+$env:ENTERPRISE_RAG_BM25_USERNAME="postgres"
+$env:ENTERPRISE_RAG_BM25_PASSWORD="postgres"
+cd portfolio-rag
+mvn -Dtest=ParadeDbBm25IntegrationTest test
+```
+
+3. 生产同构 schema 准备好后，再按顺序执行 `03_paradedb_bm25_index.sql`、`04_smoke_test.sql`。
+4. 设置 `ENTERPRISE_RAG_LEXICAL_BACKEND=PARADEDB_BM25` 和独立连接变量后启动应用。
 5. 访问 `/api/enterprise/health`，应看到 `bm25: UP`；没有 BM25 时默认自动回到 `POSTGRES_FTS`。
+
+本地没有 Docker 时必须记录 `SKIPPED: Docker unavailable`。GitHub Actions 的 `paradedb-integration` job 会显式设置 `ENTERPRISE_BM25_INTEGRATION=true` 并对真实 ParadeDB service container 执行同一个测试。
 
 ## 生产复制步骤
 
@@ -46,7 +58,11 @@ ENTERPRISE_RAG_BM25_TOP_K=20
 ENTERPRISE_RAG_BM25_CONNECT_TIMEOUT_MS=1000
 ENTERPRISE_RAG_BM25_QUERY_TIMEOUT_MS=3000
 ENTERPRISE_RAG_BM25_MAX_RETRIES=0
+ENTERPRISE_RAG_BM25_MAXIMUM_POOL_SIZE=4
+ENTERPRISE_RAG_BM25_MINIMUM_IDLE=0
 ```
+
+Spring 中的 `dataSource` / `primaryJdbcTemplate` 是显式 `@Primary` 的 Supabase Hikari pool；`bm25DataSource` / `bm25JdbcTemplate` 是带 qualifier 的独立 ParadeDB Hikari pool。普通 repository、ingestion、corpus 和 pgvector 不会因为启用 BM25 而改连搜索副本。
 
 ## 回滚
 
@@ -54,4 +70,4 @@ ENTERPRISE_RAG_BM25_MAX_RETRIES=0
 
 ## 官方语法依据
 
-索引使用 ParadeDB 当前文档的 `USING paradedb`（`USING bm25` 仍为兼容别名）、`key_field`、`pdb.icu` / `pdb.literal` 和 `pdb.score()` 语法。部署前仍应在目标 ParadeDB 镜像上执行 smoke test，因为 ParadeDB 版本升级可能要求重建索引。
+本项目固定 `paradedb/paradedb:0.24.3-pg16`，因此 DDL 使用该版本原生的 `USING bm25`。ParadeDB 0.25+ 官方文档将主名称改为 `USING paradedb`，同时明确保留 `USING bm25` 兼容别名；查询仍必须通过 `pdb.score()` 获得真实 BM25 score。部署前必须在目标固定镜像上执行 smoke test，因为跨版本升级可能要求重建索引。

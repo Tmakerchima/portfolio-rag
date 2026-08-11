@@ -41,6 +41,12 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
+        <!-- 两套 PostgreSQL 都使用 Hikari；主库 DataSource 显式 @Primary，ParadeDB 使用独立 qualifier。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
         <!-- Spring AI：OpenAI 兼容模式（接 DashScope/通义千问） -->
         <dependency>
             <groupId>org.springframework.ai</groupId>

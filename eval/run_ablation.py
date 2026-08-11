@@ -18,6 +18,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--questions", type=Path, required=True)
     parser.add_argument("--api-base", default="http://localhost:8080")
     parser.add_argument("--role", default="admin", choices=["public", "engineering", "finance", "hr", "admin"])
+    parser.add_argument("--expected-lexical-backend", required=True,
+                        choices=["POSTGRES_FTS", "PARADEDB_BM25"],
+                        help="Backend configured on the running API; mismatches are reported, never relabeled.")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--limit", type=int)
     return parser.parse_args()
@@ -26,7 +29,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    manifest = {"status": "measured", "strategies": {}, "lexical_backends": {}}
+    manifest = {"status": "measured", "expected_lexical_backend": args.expected_lexical_backend,
+                "strategies": {}, "lexical_backends": {}}
     for strategy in STRATEGIES:
         predictions = args.output_dir / f"{strategy.lower()}-predictions.jsonl"
         metrics = args.output_dir / f"{strategy.lower()}-metrics.json"
@@ -49,13 +53,19 @@ def main() -> int:
                 if backend:
                     backends.add(backend)
             manifest["lexical_backends"][strategy] = sorted(backends) or ["unknown"]
+            if strategy != "VECTOR":
+                backend_verified = backends == {args.expected_lexical_backend}
+                manifest["strategies"][strategy]["backend_verified"] = backend_verified
+                if not backend_verified:
+                    # BM25 降级成 FTS 时必须显式标记 mismatch，不能把 fallback 结果算作 BM25 指标。
+                    manifest["status"] = "BACKEND_MISMATCH"
         except (OSError, subprocess.CalledProcessError) as error:
             manifest["status"] = "SKIPPED_EXTERNAL_DEPENDENCY"
             manifest["strategies"][strategy] = {"status": "SKIPPED_EXTERNAL_DEPENDENCY", "reason": str(error)}
             break
     (args.output_dir / "ablation-manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
-    return 0
+    return 0 if manifest["status"] in {"measured", "SKIPPED_EXTERNAL_DEPENDENCY"} else 2
 
 
 if __name__ == "__main__":

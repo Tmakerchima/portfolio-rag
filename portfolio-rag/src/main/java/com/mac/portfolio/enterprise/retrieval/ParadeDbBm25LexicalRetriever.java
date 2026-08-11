@@ -24,6 +24,15 @@ public class ParadeDbBm25LexicalRetriever implements EnterpriseLexicalRetriever 
     /** deploy/paradedb/03_paradedb_bm25_index.sql 中固定的 index 名，用于健康检查。 */
     static final String BM25_INDEX_NAME = "enterprise_chunks_index_content_paradedb_idx";
 
+    /** 不要求命中数据，但必须让 ParadeDB 实际解析 operator、访问 BM25 index 并执行 pdb.score。 */
+    static final String BM25_HEALTH_SQL = """
+            SELECT pdb.score(c.chunk_id) AS score
+            FROM enterprise_chunks c
+            WHERE c.index_content ||| ?
+            ORDER BY pdb.score(c.chunk_id) DESC
+            LIMIT 1
+            """;
+
     /** 用于单元测试和代码审查的 SQL 证据：没有 ts_rank_cd，只有 ParadeDB BM25 operator/score。 */
     static final String BM25_SQL = """
             SELECT c.chunk_id, c.document_id, d.external_id, d.source, d.source_type, d.title,
@@ -109,16 +118,24 @@ public class ParadeDbBm25LexicalRetriever implements EnterpriseLexicalRetriever 
         try {
             jdbcTemplate.setQueryTimeout(Math.max(1, (int) Math.ceil(queryTimeoutMs / 1000.0)));
             Integer indexPresent = jdbcTemplate.queryForObject(
-                    "SELECT count(*) FROM pg_class WHERE relname = ?", Integer.class, BM25_INDEX_NAME);
+                    """
+                    SELECT count(*)
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relname = ? AND n.nspname = current_schema() AND c.relkind = 'i'
+                    """, Integer.class, BM25_INDEX_NAME);
             if (indexPresent == null || indexPresent == 0) {
                 return new EnterpriseLexicalHealth("PARADEDB_BM25", "PARADEDB_BM25", false,
                         "BM25_INDEX_MISSING");
             }
+            // 仅有 pg_class 记录还不够：必须真的执行一次 ParadeDB operator + pdb.score capability probe。
+            jdbcTemplate.query(BM25_HEALTH_SQL, (rs, rowNum) -> rs.getDouble("score"),
+                    "__enterprise_bm25_healthcheck__");
             return new EnterpriseLexicalHealth("PARADEDB_BM25", "PARADEDB_BM25", true, null);
-        } catch (DataAccessException error) {
+        } catch (RuntimeException error) {
             log.warn("ParadeDB BM25 health check failed: {}", error.getMessage());
             return new EnterpriseLexicalHealth("PARADEDB_BM25", "PARADEDB_BM25", false,
-                    "BM25_UNAVAILABLE");
+                    "BM25_CAPABILITY_CHECK_FAILED");
         }
     }
 }

@@ -24,21 +24,43 @@ class ParadeDbBm25IntegrationTest {
         String password = System.getenv().getOrDefault("ENTERPRISE_RAG_BM25_PASSWORD", "postgres");
         try (var connection = DriverManager.getConnection(url, user, password);
              var statement = connection.createStatement()) {
-            statement.execute("CREATE TEMP TABLE bm25_context_fixture (chunk_id varchar(64) PRIMARY KEY, index_content text, content text)");
-            statement.execute("INSERT INTO bm25_context_fixture VALUES "
-                    + "('a', 'Error code TS-999 means the upload worker exhausted retry attempts. ACME Q2 2025 revenue growth.', 'Error code TS-999 means the upload worker exhausted retry attempts.'),"
-                    + "('b', 'Error code TS-998 means authentication failed. Beta Q1 2024 performance.', 'Error code TS-998 means authentication failed.'),"
-                    + "('c', 'General documentation about upload worker errors.', 'General documentation about upload worker errors.')");
-            statement.execute("CREATE INDEX bm25_context_fixture_idx ON bm25_context_fixture "
-                    + "USING paradedb ((chunk_id::pdb.literal), (index_content::pdb.icu)) WITH (key_field='chunk_id')");
+            statement.execute("DROP TABLE IF EXISTS bm25_context_fixture");
+            try {
+                statement.execute("CREATE TABLE bm25_context_fixture (chunk_id varchar(64) PRIMARY KEY, contextual_prefix text, index_content text, content text)");
+                statement.execute("INSERT INTO bm25_context_fixture VALUES "
+                        + "('exact-a', '', 'Error code TS-999 means the upload worker exhausted retry attempts.', 'Error code TS-999 means the upload worker exhausted retry attempts.'),"
+                        + "('exact-b', '', 'Error code TS-998 means authentication failed.', 'Error code TS-998 means authentication failed.'),"
+                        + "('general', '', 'General documentation about upload worker errors.', 'General documentation about upload worker errors.'),"
+                        + "('acme', 'ACME Corporation Q2 2025 revenue performance.', 'ACME Corporation Q2 2025 revenue performance. Revenue increased by 3%.', 'Revenue increased by 3%.'),"
+                        + "('beta', 'Beta Corporation Q1 2024 revenue performance.', 'Beta Corporation Q1 2024 revenue performance. Revenue increased by 8%.', 'Revenue increased by 8%.')");
+                statement.execute("CREATE INDEX bm25_context_fixture_idx ON bm25_context_fixture "
+                        + "USING bm25 ((chunk_id::pdb.literal), (index_content::pdb.icu)) WITH (key_field='chunk_id')");
 
-            try (ResultSet result = statement.executeQuery("SELECT chunk_id, pdb.score(chunk_id) AS score "
-                    + "FROM bm25_context_fixture WHERE index_content ||| 'ACME Q2 2025 revenue growth' "
-                    + "ORDER BY pdb.score(chunk_id) DESC, chunk_id LIMIT 5")) {
-                assertThat(result.next()).isTrue();
-                assertThat(result.getString("chunk_id")).isEqualTo("a");
-                assertThat(result.getDouble("score")).isGreaterThan(0.0);
+                // Test 1：精确错误码 TS-999 必须排第一，证明不是 Java 手算或普通 LIKE。
+                assertFirst(statement.executeQuery("SELECT chunk_id, pdb.score(chunk_id) AS score "
+                        + "FROM bm25_context_fixture WHERE index_content ||| 'TS-999' "
+                        + "ORDER BY pdb.score(chunk_id) DESC, chunk_id LIMIT 5"), "exact-a");
+
+                // Test 2：ACME/Q2/2025 只存在 prefix，BM25 仍召回；content 保持原始可引用句子。
+                try (ResultSet result = statement.executeQuery("SELECT chunk_id, content, pdb.score(chunk_id) AS score "
+                        + "FROM bm25_context_fixture WHERE index_content ||| 'ACME Q2 2025 revenue' "
+                        + "ORDER BY pdb.score(chunk_id) DESC, chunk_id LIMIT 5")) {
+                    assertThat(result.next()).isTrue();
+                    assertThat(result.getString("chunk_id")).isEqualTo("acme");
+                    assertThat(result.getString("content")).isEqualTo("Revenue increased by 3%.");
+                    assertThat(result.getDouble("score")).isGreaterThan(0.0);
+                }
+            } finally {
+                statement.execute("DROP TABLE IF EXISTS bm25_context_fixture");
             }
+        }
+    }
+
+    private void assertFirst(ResultSet result, String expectedChunkId) throws Exception {
+        try (result) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getString("chunk_id")).isEqualTo(expectedChunkId);
+            assertThat(result.getDouble("score")).isGreaterThan(0.0);
         }
     }
 
