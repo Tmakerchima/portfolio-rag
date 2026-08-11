@@ -87,11 +87,13 @@ public class EnterpriseChatService {
             Mono<String> metrics = Mono.fromSupplier(() -> metricsFrame(requestId, retrieval, started));
             return Flux.concat(Mono.just(sourcesFrame), answer, metrics)
                     .doOnComplete(() -> log.info(
-                            "enterprise_request request_id={} strategy={} vector_latency={}ms fts_latency={}ms " +
-                                    "rerank_latency={}ms candidate_count={} context_count={} query_count={} total_latency={}ms",
-                            requestId, strategy, retrieval.metrics().vectorMs(), retrieval.metrics().ftsMs(),
-                            retrieval.metrics().rerankMs(), retrieval.metrics().candidateCount(),
-                            retrieval.metrics().finalContextCount(), retrieval.metrics().queryCount(), elapsedMs(started)));
+                            "enterprise_request request_id={} strategy={} lexical_backend={} vector_latency={}ms " +
+                                    "bm25_or_fts_latency={}ms rerank_latency={}ms candidate_count={} " +
+                            "context_count={} query_count={} fallback={} total_latency={}ms",
+                            requestId, strategy, retrieval.metrics().lexicalBackend(), retrieval.metrics().vectorMs(),
+                            retrieval.metrics().ftsMs(), retrieval.metrics().rerankMs(), retrieval.metrics().candidateCount(),
+                            retrieval.metrics().finalContextCount(), retrieval.metrics().queryCount(),
+                            retrieval.metrics().fallback(), elapsedMs(started)));
         }).onErrorResume(error -> Flux.just(errorFrame("unknown", "Enterprise request failed")))
                 .subscribeOn(Schedulers.boundedElastic());
     }
@@ -138,6 +140,10 @@ public class EnterpriseChatService {
         metrics.put("strategy", retrieval.strategy().name());
         metrics.put("vector_ms", values.vectorMs());
         metrics.put("fts_ms", values.ftsMs());
+        metrics.put("lexical_ms", values.ftsMs());
+        metrics.put("bm25_query_latency_ms", values.lexicalBackend().contains("BM25") ? values.ftsMs() : 0);
+        metrics.put("lexical_backend", values.lexicalBackend());
+        metrics.put("bm25_fallback", values.fallback() != null && values.fallback().contains("BM25"));
         metrics.put("rrf_ms", values.rrfMs());
         metrics.put("rerank_ms", values.rerankMs());
         metrics.put("llm_ms", Math.max(0, elapsedMs(started) - values.vectorMs() - values.ftsMs() - values.rrfMs() - values.rerankMs()));

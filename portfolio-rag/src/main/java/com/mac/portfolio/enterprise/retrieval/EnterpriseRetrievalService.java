@@ -7,6 +7,7 @@ import com.mac.portfolio.enterprise.repository.EnterpriseDocumentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,7 @@ public class EnterpriseRetrievalService {
     private static final Logger log = LoggerFactory.getLogger(EnterpriseRetrievalService.class);
 
     private final EnterpriseDocumentRepository repository;
+    private final EnterpriseLexicalRetriever lexicalRetriever;
     private final EmbeddingModel embeddingModel;
     private final RrfFusion rrfFusion;
     private final Reranker reranker;
@@ -30,8 +32,30 @@ public class EnterpriseRetrievalService {
     private final double similarityThreshold;
     private final boolean rerankEnabled;
 
+    /**
+     * 兼容旧的单元测试/内部调用：旧构造器自动包一层 PostgreSQL FTS。
+     * Spring 生产构造器使用下面带 lexicalRetriever 的版本，因此 KEYWORD 仍可切到 BM25。
+     */
     public EnterpriseRetrievalService(
             EnterpriseDocumentRepository repository,
+            EmbeddingModel embeddingModel,
+            RrfFusion rrfFusion,
+            Reranker reranker,
+            int vectorTopK,
+            int keywordTopK,
+            int finalTopK,
+            int rrfK,
+            int maxContextChars,
+            double similarityThreshold,
+            boolean rerankEnabled) {
+        this(repository, new PostgresFtsLexicalRetriever(repository), embeddingModel, rrfFusion, reranker,
+                vectorTopK, keywordTopK, finalTopK, rrfK, maxContextChars, similarityThreshold, rerankEnabled);
+    }
+
+    @Autowired
+    public EnterpriseRetrievalService(
+            EnterpriseDocumentRepository repository,
+            EnterpriseLexicalRetriever lexicalRetriever,
             EmbeddingModel embeddingModel,
             RrfFusion rrfFusion,
             Reranker reranker,
@@ -43,6 +67,7 @@ public class EnterpriseRetrievalService {
             @Value("${enterprise.rag.similarity-threshold:0.20}") double similarityThreshold,
             @Value("${enterprise.rag.rerank-enabled:true}") boolean rerankEnabled) {
         this.repository = repository;
+        this.lexicalRetriever = lexicalRetriever;
         this.embeddingModel = embeddingModel;
         this.rrfFusion = rrfFusion;
         this.reranker = reranker;
@@ -60,6 +85,7 @@ public class EnterpriseRetrievalService {
         String safeQuery = query == null ? "" : query.trim();
         List<EnterpriseSearchHit> vectorHits = List.of();
         List<EnterpriseSearchHit> keywordHits = List.of();
+        EnterpriseLexicalSearchResult lexicalResult = EnterpriseLexicalSearchResult.of(List.of(), "NOT_USED");
         boolean vectorFailed = false;
         boolean keywordFailed = false;
         boolean rerankerFailed = false;
@@ -84,10 +110,12 @@ public class EnterpriseRetrievalService {
                 || strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK) {
             long started = System.nanoTime();
             try {
-                keywordHits = repository.searchKeyword(safeQuery, access, keywordTopK);
+                // KEYWORD 在这里代表“配置的 lexical backend”：生产可为 BM25，故不再直接调用 FTS repository。
+                lexicalResult = lexicalRetriever.search(safeQuery, access, keywordTopK);
+                keywordHits = lexicalResult.hits();
             } catch (Exception e) {
                 keywordFailed = true;
-                log.warn("Enterprise FTS retrieval failed; continuing with vector fallback: {}", e.getMessage());
+                log.warn("Enterprise lexical retrieval failed; continuing with vector fallback: {}", e.getMessage());
             } finally {
                 ftsMs = elapsedMs(started);
             }
@@ -97,6 +125,7 @@ public class EnterpriseRetrievalService {
         List<EnterpriseSearchHit> candidates;
         if (strategy == EnterpriseRetrievalStrategy.VECTOR) candidates = vectorHits;
         else if (strategy == EnterpriseRetrievalStrategy.KEYWORD) candidates = keywordHits;
+        // Vector cosine score 与 BM25 score 不在同一数值尺度，不能直接加权；混合策略只按名次做 RRF。
         else candidates = rrfFusion.fuse(vectorHits, keywordHits, rrfK, Math.max(finalTopK * 3, finalTopK));
         long rrfMs = elapsedMs(rrfStarted);
 
@@ -111,11 +140,14 @@ public class EnterpriseRetrievalService {
         }
         long rerankMs = strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK && rerankEnabled ? elapsedMs(rerankStarted) : 0;
 
+        // 所有候选在这里已经过 ACL；只截断原始 content，绝不把 contextual prefix 送进回答证据。
         List<EnterpriseSearchHit> finalHits = limitContext(candidates);
+        String retrievalFallback = fallback(vectorFailed, keywordFailed, rerankerFailed);
+        retrievalFallback = mergeFallback(retrievalFallback, lexicalResult.fallbackReason());
         return new EnterpriseRetrievalResult(finalHits, strategy,
                 new EnterpriseRetrievalMetrics(vectorMs, ftsMs, rrfMs, rerankMs,
                         distinctCount(vectorHits, keywordHits), finalHits.size(),
-                        fallback(vectorFailed, keywordFailed, rerankerFailed)));
+                        retrievalFallback, 1, lexicalResult.backend()));
     }
 
     /** Merges optional rewritten-query results while enforcing exactly the same access context. */
@@ -158,8 +190,14 @@ public class EnterpriseRetrievalService {
                 results.stream().mapToLong(result -> result.metrics().rerankMs()).sum() + mergeRerankMs,
                 (int) results.stream().flatMap(result -> result.hits().stream())
                         .map(EnterpriseSearchHit::chunkId).distinct().count(),
-                finalHits.size(), combineFallback(results), results.size());
+                finalHits.size(), combineFallback(results), results.size(), combineLexicalBackend(results));
         return new EnterpriseRetrievalResult(finalHits, strategy, metrics);
+    }
+
+    private String combineLexicalBackend(List<EnterpriseRetrievalResult> results) {
+        return results.stream().map(result -> result.metrics().lexicalBackend())
+                .filter(value -> value != null && !value.isBlank())
+                .distinct().reduce((left, right) -> left + "," + right).orElse("NOT_USED");
     }
 
     private String combineFallback(List<EnterpriseRetrievalResult> results) {
@@ -174,6 +212,13 @@ public class EnterpriseRetrievalService {
         if (keywordFailed) return "VECTOR_ONLY";
         if (rerankerFailed) return "RRF";
         return null;
+    }
+
+    private String mergeFallback(String primary, String lexical) {
+        if (lexical == null || lexical.isBlank()) return primary;
+        if (primary == null || primary.isBlank()) return lexical;
+        if (primary.contains(lexical)) return primary;
+        return primary + "," + lexical;
     }
 
     private List<EnterpriseSearchHit> limitContext(List<EnterpriseSearchHit> candidates) {

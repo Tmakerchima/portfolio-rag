@@ -68,6 +68,21 @@ enterprise:
     similarity-threshold: ${ENTERPRISE_RAG_SIMILARITY_THRESHOLD:0.20}
     strategy: ${ENTERPRISE_RAG_STRATEGY:HYBRID}
     rerank-enabled: ${ENTERPRISE_RAG_RERANK_ENABLED:true}
+    # lexical 是可切换的抽象：默认保持旧 PostgreSQL FTS，生产可切换为真正 ParadeDB BM25。
+    lexical:
+      backend: ${ENTERPRISE_RAG_LEXICAL_BACKEND:POSTGRES_FTS}
+      # true 表示 BM25 连接/查询失败时回退 FTS；false 表示让请求明确失败，便于严格发现配置问题。
+      fail-open: ${ENTERPRISE_RAG_LEXICAL_FAIL_OPEN:true}
+    bm25:
+      # 这是 ParadeDB 搜索副本的独立 JDBC URL，不要填 Supabase 主库 URL。
+      url: ${ENTERPRISE_RAG_BM25_URL:}
+      username: ${ENTERPRISE_RAG_BM25_USERNAME:}
+      # 密码只从操作系统环境变量或 secret manager 注入，禁止把真实值写入 yml。
+      password: ${ENTERPRISE_RAG_BM25_PASSWORD:}
+      top-k: ${ENTERPRISE_RAG_BM25_TOP_K:20}
+      connect-timeout-ms: ${ENTERPRISE_RAG_BM25_CONNECT_TIMEOUT_MS:1000}
+      query-timeout-ms: ${ENTERPRISE_RAG_BM25_QUERY_TIMEOUT_MS:3000}
+      max-retries: ${ENTERPRISE_RAG_BM25_MAX_RETRIES:0}
     reranker:
       # HEURISTIC changes ranking without another API call; LLM enables listwise model reranking.
       mode: ${ENTERPRISE_RAG_RERANKER_MODE:HEURISTIC}

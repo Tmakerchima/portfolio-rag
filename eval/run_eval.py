@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def stream_answer(api_base: str, question: str, role: str, strategy: str) -> tuple[str, list[str], list[str]]:
+def stream_answer(api_base: str, question: str, role: str, strategy: str) -> tuple[str, list[str], list[str], dict[str, object]]:
     body = json.dumps({"question": question, "role": role, "strategy": strategy}).encode("utf-8")
     request = urllib.request.Request(api_base.rstrip("/") + "/api/enterprise/chat", data=body, method="POST", headers={
         "Content-Type": "application/json", "Accept": "text/event-stream",
@@ -28,6 +28,7 @@ def stream_answer(api_base: str, question: str, role: str, strategy: str) -> tup
     answer: list[str] = []
     document_ids: list[str] = []
     contexts: list[str] = []
+    metrics: dict[str, object] = {}
     with urllib.request.urlopen(request) as response:
         for raw_line in response:
             line = raw_line.decode("utf-8").strip()
@@ -38,11 +39,13 @@ def stream_answer(api_base: str, question: str, role: str, strategy: str) -> tup
                 frame = json.loads(data[len("@@SOURCES@@"):])
                 document_ids = [source["document_id"] for source in frame.get("sources", [])]
                 contexts = [source.get("chunk", "") for source in frame.get("sources", [])]
-            elif data.startswith("@@METRICS@@") or data.startswith("@@ERROR@@"):
-                continue
+            elif data.startswith("@@METRICS@@"):
+                metrics = json.loads(data[len("@@METRICS@@"):])
+            elif data.startswith("@@ERROR@@"):
+                metrics["error"] = data[len("@@ERROR@@"):]
             else:
                 answer.append(data)
-    return "".join(answer), document_ids, contexts
+    return "".join(answer), document_ids, contexts, metrics
 
 
 def main() -> int:
@@ -54,7 +57,7 @@ def main() -> int:
             if args.limit is not None and count >= args.limit:
                 break
             item = json.loads(line)
-            answer, document_ids, contexts = stream_answer(args.api_base, item["question"], args.role, args.strategy)
+            answer, document_ids, contexts, metrics = stream_answer(args.api_base, item["question"], args.role, args.strategy)
             output.write(json.dumps({
                 "question_id": item["question_id"],
                 "question": item["question"],
@@ -62,6 +65,7 @@ def main() -> int:
                 "answer": answer,
                 "document_ids": document_ids,
                 "contexts": contexts,
+                "metrics": metrics,
             }, ensure_ascii=False) + "\n")
             count += 1
             print(f"evaluated {count}: {item['question_id']}", flush=True)

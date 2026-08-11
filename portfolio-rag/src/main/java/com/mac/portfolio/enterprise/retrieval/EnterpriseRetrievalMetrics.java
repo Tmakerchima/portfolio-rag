@@ -8,15 +8,23 @@ public record EnterpriseRetrievalMetrics(
         int candidateCount,
         int finalContextCount,
         String fallback,
-        int queryCount) {
+        int queryCount,
+        String lexicalBackend) {
 
     public EnterpriseRetrievalMetrics(long vectorMs, long ftsMs, long rrfMs, long rerankMs,
                                       int candidateCount, int finalContextCount, String fallback) {
-        this(vectorMs, ftsMs, rrfMs, rerankMs, candidateCount, finalContextCount, fallback, 1);
+        this(vectorMs, ftsMs, rrfMs, rerankMs, candidateCount, finalContextCount, fallback, 1, "POSTGRES_FTS");
     }
 
     public EnterpriseRetrievalMetrics(long vectorMs, long ftsMs, long rrfMs, long rerankMs,
                                       int candidateCount, int finalContextCount) {
-        this(vectorMs, ftsMs, rrfMs, rerankMs, candidateCount, finalContextCount, null, 1);
+        this(vectorMs, ftsMs, rrfMs, rerankMs, candidateCount, finalContextCount, null, 1, "POSTGRES_FTS");
+    }
+
+    public EnterpriseRetrievalMetrics(long vectorMs, long ftsMs, long rrfMs, long rerankMs,
+                                      int candidateCount, int finalContextCount, String fallback,
+                                      int queryCount) {
+        this(vectorMs, ftsMs, rrfMs, rerankMs, candidateCount, finalContextCount, fallback, queryCount,
+                "POSTGRES_FTS");
     }
 }
