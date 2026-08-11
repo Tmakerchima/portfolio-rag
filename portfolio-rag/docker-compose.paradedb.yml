@@ -1,0 +1,21 @@
+services:
+  paradedb:
+    # 固定版本，避免 latest 在本地或 CI 中悄悄改变 BM25 SQL/索引行为。
+    image: paradedb/paradedb:0.24.3-pg16
+    container_name: portfolio-paradedb
+    environment:
+      POSTGRES_DB: enterprise_search
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - paradedb-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d enterprise_search"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  paradedb-data:

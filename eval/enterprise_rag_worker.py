@@ -422,6 +422,8 @@ def write_document(connection, corpus_id: str, document: BenchDocument,
     for chunk, prefix, vector in zip(document_chunks, prefixes, vectors):
         chunk_id = stable_id("chunk", corpus_id,
                              document.external_id + f":{chunk.index}:{sha256(chunk.content)}")
+        # 与 Java ingestion 保持同一语义：content 是唯一原始证据，prefix 只用于检索，
+        # index_content 同时喂给 contextual embedding 与 ParadeDB BM25；worker 不做 dual-write。
         index_content = (prefix + "\n\n" if prefix else "") + chunk.content
         rows.append((corpus_id, chunk_id, document_id, chunk.index, chunk.content, prefix,
                      index_content, sha256(chunk.content), token_count(index_content),
@@ -444,6 +446,7 @@ def write_document(connection, corpus_id: str, document: BenchDocument,
                     FROM STDIN""") as copy:
                 for row in rows:
                     copy.write_row(row)
+        # 先用 staging COPY 完成批量准备，最后一次性替换当前文档 Chunk，避免半套 index。
         connection.execute("""
             INSERT INTO enterprise_documents
                 (corpus_id, document_id, external_id, source, source_type, title, content, content_hash,

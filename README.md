@@ -3,7 +3,7 @@
 一个仓库、两条刻意分开的知识问答链路：
 
 - **简历 AI Agent**：把完整 `about-mac.md` 作为静态上下文交给 Qwen；不查询向量库。博客和 GitHub 等动态信息才使用 Function Calling / MCP。
-- **EnterpriseRAG**：对 EnterpriseRAG-Bench 文档做离线切块和向量化，使用 PostgreSQL FTS + PGVector + RRF 检索，再让 Qwen 基于有限证据回答。
+- **EnterpriseRAG**：对 EnterpriseRAG-Bench 文档做离线切块和向量化，使用可配置的 PostgreSQL FTS / ParadeDB BM25 + PGVector + RRF 检索，再让 Qwen 基于有限证据回答。
 
 [EnterpriseRAG Live Site](https://enterprise-rag-frontend-seven.vercel.app/) · [个人主页](https://tmakerchima.cn/) · [GitHub](https://github.com/Tmakerchima/portfolio-rag)
 
@@ -31,7 +31,8 @@ flowchart LR
     EF -->|"POST /api/enterprise/chat"| B
     B -->|"完整 about-mac.md"| Q["Qwen"]
     B -->|"动态问题"| T["Function Calling / GitHub MCP"]
-    B -->|"FTS + PGVector"| P["Supabase PostgreSQL"]
+    B -->|"PGVector + lexical backend"| P["Supabase PostgreSQL"]
+    B -.->|"PARADEDB_BM25 可选"| S["ParadeDB search replica"]
     P -->|"RRF 后的有限证据"| Q
     Q -->|"SSE"| PF
     Q -->|"SSE + Sources + Metrics"| EF
@@ -74,7 +75,10 @@ sequenceDiagram
     U->>V: 问题 + role + strategy
     V->>B: POST /api/enterprise/chat
     B->>D: 1 次 query embedding
-    B->>P: PGVector 向量召回 + FTS 关键词召回
+    B->>P: PGVector 向量召回 + 配置的 lexical 召回
+    opt ENTERPRISE_RAG_LEXICAL_BACKEND=PARADEDB_BM25
+        B->>S: Contextual BM25(index_content)
+    end
     P-->>B: ACL 过滤后的候选 chunks
     B->>B: RRF 融合并限制 context
     B->>D: 1 次 grounded Qwen 生成
@@ -88,7 +92,7 @@ sequenceDiagram
 1. UTF-8 解码、统一换行并去掉首尾空白。
 2. 使用 `tiktoken/cl100k_base` 计数，默认每段最多 **700 tokens**、同章节重叠 **80 tokens**。
 3. 优先保留 Markdown 标题层级、段落、列表和 fenced code block；只有超长 block 才按 token 窗口切分。
-4. `content` 保存可引用原文；`contextual_prefix` 保存可选 LLM 背景；`index_content` 用于 embedding 与 FTS。
+4. `content` 保存可引用原文；`contextual_prefix` 保存可选 LLM 背景；`index_content` 同时用于 contextual embedding 与 lexical 检索（FTS fallback 或 ParadeDB BM25）。
 5. Contextualizer 默认关闭；显式 `--contextual-enabled` 后每个 chunk 产生一次 chat 调用，失败默认停止以避免混合索引。
 6. 文档和 chunk 使用 SHA-256 稳定标识；写库时一个文档一个事务，先替换该文档旧 chunks，再提交新版本。
 7. 每批 embedding 最多 10 段，并用 pipeline fingerprint 阻止旧 checkpoint 混入新切块策略。
@@ -187,7 +191,7 @@ Vercel 的个人主页使用 `VITE_API_BASE`，Enterprise 前端使用 `VITE_API
 7. **数据库容量治理**：监控表、WAL、GIN/HNSW 和旧 generations；先保留可回滚版本，再按保留策略清理。量化或 `halfvec` 必须经过召回率与兼容性测试。
 8. **生产防护**：收紧 CORS、增加限流/配额、管理接口鉴权、日志脱敏，以及问题级 tracing 和离线回归评估。
 
-更完整的运行、降级、回滚和验收说明见 [`docs/enterprise-rag-end-to-end-flow.md`](docs/enterprise-rag-end-to-end-flow.md)。
+更完整的运行、降级、回滚和验收说明见 [`docs/enterprise-rag-end-to-end-flow.md`](docs/enterprise-rag-end-to-end-flow.md)；ParadeDB Contextual BM25 的配置、复制与 smoke test 见 [`docs/enterprise-contextual-bm25.md`](docs/enterprise-contextual-bm25.md)。
 
 ## 安全
 

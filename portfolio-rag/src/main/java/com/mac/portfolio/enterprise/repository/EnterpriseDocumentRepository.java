@@ -170,7 +170,11 @@ public class EnterpriseDocumentRepository {
                 .toList();
     }
 
-    private EnterpriseSearchHit mapHit(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+    /**
+     * 统一把 Supabase/ParadeDB 两个 lexical backend 的行映射成同一份安全结果。
+     * BM25 数据源只负责执行搜索，原始 content 和 ACL 元数据仍使用同一映射规则。
+     */
+    public EnterpriseSearchHit mapHit(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
         return new EnterpriseSearchHit(
                 rs.getString("chunk_id"),
                 rs.getString("document_id"),
