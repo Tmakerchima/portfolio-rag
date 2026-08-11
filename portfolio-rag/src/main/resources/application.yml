@@ -58,7 +58,8 @@ enterprise:
     enabled: ${ENTERPRISE_RAG_ENABLED:true}
     # This is only a bounded HTTP canary guard. Full corpus loads use eval/enterprise_rag_worker.py.
     max-documents: ${ENTERPRISE_RAG_MAX_DOCUMENTS:1000}
-    max-chunk-chars: ${ENTERPRISE_RAG_MAX_CHUNK_CHARS:1600}
+    max-chunk-tokens: ${ENTERPRISE_RAG_MAX_CHUNK_TOKENS:700}
+    chunk-overlap-tokens: ${ENTERPRISE_RAG_CHUNK_OVERLAP_TOKENS:80}
     vector-top-k: ${ENTERPRISE_RAG_VECTOR_TOP_K:12}
     keyword-top-k: ${ENTERPRISE_RAG_KEYWORD_TOP_K:12}
     final-top-k: ${ENTERPRISE_RAG_FINAL_TOP_K:5}
@@ -67,6 +68,24 @@ enterprise:
     similarity-threshold: ${ENTERPRISE_RAG_SIMILARITY_THRESHOLD:0.20}
     strategy: ${ENTERPRISE_RAG_STRATEGY:HYBRID}
     rerank-enabled: ${ENTERPRISE_RAG_RERANK_ENABLED:true}
+    reranker:
+      # HEURISTIC changes ranking without another API call; LLM enables listwise model reranking.
+      mode: ${ENTERPRISE_RAG_RERANKER_MODE:HEURISTIC}
+      max-candidates: ${ENTERPRISE_RAG_RERANKER_MAX_CANDIDATES:30}
+      max-chars-per-candidate: ${ENTERPRISE_RAG_RERANKER_MAX_CHARS:1600}
+    contextual:
+      # Explicit opt-in: enabling this makes one chat-model request per new/changed chunk.
+      enabled: ${ENTERPRISE_RAG_CONTEXTUAL_ENABLED:false}
+      fail-open: ${ENTERPRISE_RAG_CONTEXTUAL_FAIL_OPEN:false}
+      max-document-chars: ${ENTERPRISE_RAG_CONTEXTUAL_MAX_DOCUMENT_CHARS:60000}
+      max-prefix-chars: ${ENTERPRISE_RAG_CONTEXTUAL_MAX_PREFIX_CHARS:800}
+    agentic:
+      # Optional second-pass query planning; rewritten queries always reuse server-side ACL context.
+      enabled: ${ENTERPRISE_RAG_AGENTIC_ENABLED:false}
+      max-rewritten-queries: ${ENTERPRISE_RAG_AGENTIC_MAX_QUERIES:2}
+      min-initial-hits: ${ENTERPRISE_RAG_AGENTIC_MIN_INITIAL_HITS:3}
+      long-query-chars: ${ENTERPRISE_RAG_AGENTIC_LONG_QUERY_CHARS:180}
+      snippet-chars: ${ENTERPRISE_RAG_AGENTIC_SNIPPET_CHARS:500}
     admin-token: ${ENTERPRISE_RAG_ADMIN_TOKEN:}
     vector-backend: ${ENTERPRISE_RAG_VECTOR_BACKEND:PGVECTOR}
     active-corpus-id: ${ENTERPRISE_RAG_ACTIVE_CORPUS_ID:}

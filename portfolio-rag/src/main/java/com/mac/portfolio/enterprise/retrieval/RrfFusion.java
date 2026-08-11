@@ -32,6 +32,24 @@ public class RrfFusion {
                 .toList();
     }
 
+    public List<EnterpriseSearchHit> fuseAll(List<List<EnterpriseSearchHit>> rankedLists,
+                                             int rrfK,
+                                             int finalTopK) {
+        if (rankedLists == null || rrfK < 1 || finalTopK < 1) return List.of();
+        Map<String, EnterpriseSearchHit> hits = new LinkedHashMap<>();
+        Map<String, Double> scores = new LinkedHashMap<>();
+        for (List<EnterpriseSearchHit> ranked : rankedLists) add(hits, scores, ranked, rrfK);
+        List<EnterpriseSearchHit> values = scores.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue(Comparator.reverseOrder())
+                        .thenComparing(Map.Entry::getKey))
+                .limit(finalTopK)
+                .map(entry -> hits.get(entry.getKey()).withScore(entry.getValue(), 0))
+                .toList();
+        return java.util.stream.IntStream.range(0, values.size())
+                .mapToObj(index -> values.get(index).withScore(values.get(index).score(), index + 1))
+                .toList();
+    }
+
     private void add(Map<String, EnterpriseSearchHit> hits, Map<String, Double> scores,
                      List<EnterpriseSearchHit> rankedHits, int rrfK) {
         if (rankedHits == null) return;

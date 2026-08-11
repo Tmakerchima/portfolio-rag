@@ -86,13 +86,14 @@ sequenceDiagram
 生产导入器是 [`eval/enterprise_rag_worker.py`](eval/enterprise_rag_worker.py)，默认策略为：
 
 1. UTF-8 解码、统一换行并去掉首尾空白。
-2. 以空行分段，尽量把完整段落聚合到 **2,400 字符**以内。
-3. 单个超长段落用 2,400 字符滑窗切分，相邻窗口重叠 **240 字符**，步长 2,160。
-4. 每个 chunk 增加 `source_type`、标题、`external_id` 和 `chunk_index` 前缀，提高孤立片段的可检索性。
-5. 文档和 chunk 使用 SHA-256 稳定标识；写库时一个文档一个事务，先替换该文档旧 chunks，再提交新版本。
-6. 每批 embedding 最多 10 段。当前样本单篇最多 8 chunks，因此 5,000 篇文档实际产生 5,000 次 embedding HTTP 请求。
+2. 使用 `tiktoken/cl100k_base` 计数，默认每段最多 **700 tokens**、同章节重叠 **80 tokens**。
+3. 优先保留 Markdown 标题层级、段落、列表和 fenced code block；只有超长 block 才按 token 窗口切分。
+4. `content` 保存可引用原文；`contextual_prefix` 保存可选 LLM 背景；`index_content` 用于 embedding 与 FTS。
+5. Contextualizer 默认关闭；显式 `--contextual-enabled` 后每个 chunk 产生一次 chat 调用，失败默认停止以避免混合索引。
+6. 文档和 chunk 使用 SHA-256 稳定标识；写库时一个文档一个事务，先替换该文档旧 chunks，再提交新版本。
+7. 每批 embedding 最多 10 段，并用 pipeline fingerprint 阻止旧 checkpoint 混入新切块策略。
 
-本批 5,000 篇文档最终得到 15,816 chunks，送入 embedding 的文本约 2,733 万字符。按中英文混合文本粗估约 820 万 tokens；实际计费以 DashScope usage 为准。
+旧 `worker-v1` 基线的 5,000 篇文档得到 15,816 chunks、约 820 万输入 tokens；切换到 v2 后必须重新 dry-run/评测，不能把旧统计当作新方案结果。
 
 ## 为什么数据量一大就显得贵
 
@@ -130,7 +131,8 @@ flowchart TD
 | 简历静态问题 | 通常 1 | 一次 Qwen 生成；无 query embedding |
 | 简历实时工具问题 | 通常 2+ 个模型回合 | 模型决定工具、工具返回后继续生成；另有 GitHub/博客外部请求 |
 | Enterprise `HYBRID` 问题 | 2 | 一次 query embedding + 一次 Qwen 生成 |
-| 5,000 文档当前导入 | 5,000 embedding HTTP 请求 | 共 15,816 inputs，token 约 820 万 |
+| 5,000 文档旧 worker-v1 导入 | 5,000 embedding HTTP 请求 | 历史基线：15,816 inputs，约 820 万 tokens |
+| v2 Contextual 入库 | embedding + 每 chunk 1 次 chat | 默认关闭；必须先做小样本成本/召回 A/B |
 
 `qwen-plus` 北京地域公开价在不超过 128K 上下文档位为输入 **¥0.8 / 百万 tokens**、非思考输出 **¥2 / 百万 tokens**。简历约 2,000 输入 tokens，再生成 200–500 tokens 时，一次简单静态问答粗估约 **¥0.002–¥0.003**。Enterprise 单问成本取决于实际检索 context 和输出长度。请以响应中的 usage 和 [Qwen Plus 官方计费页](https://help.aliyun.com/zh/model-studio/qwen-plus) 为准，不要把这里的估算当账单。
 

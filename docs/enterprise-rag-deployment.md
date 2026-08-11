@@ -2,7 +2,7 @@
 
 ## Supabase / PostgreSQL
 
-1. 在目标数据库人工审阅并执行 `portfolio-rag/src/main/resources/db/migration/V1__enterprise_rag.sql`，然后执行 additive 的 `V2__enterprise_rag_generations.sql`。
+1. 在目标数据库人工审阅并依次执行 `V1__enterprise_rag.sql`、`V2__enterprise_rag_generations.sql`、`V3__enterprise_contextual_retrieval.sql`。
 2. 确认 `vector` 扩展可用、`enterprise_documents` 和 `enterprise_chunks` 存在，以及 HNSW/GIN 索引已建立。
 3. 本任务不会自动连接生产 Supabase，也不会修改或删除现有 `vector_store`。
 
@@ -38,6 +38,8 @@ curl.exe -L --retry 5 --retry-delay 5 --continue-at - --fail --show-error `
 ```text
 ENTERPRISE_RAG_ENABLED=true
 ENTERPRISE_RAG_MAX_DOCUMENTS=1000 # HTTP canary guard only
+ENTERPRISE_RAG_MAX_CHUNK_TOKENS=700
+ENTERPRISE_RAG_CHUNK_OVERLAP_TOKENS=80
 ENTERPRISE_RAG_VECTOR_BACKEND=PGVECTOR
 ENTERPRISE_RAG_ACTIVE_CORPUS_ID=<only-a-validated-active-corpus>
 ENTERPRISE_RAG_EMBEDDING_MODEL=text-embedding-v3
@@ -48,6 +50,9 @@ ENTERPRISE_RAG_FINAL_TOP_K=5
 ENTERPRISE_RAG_RRF_K=60
 ENTERPRISE_RAG_STRATEGY=HYBRID
 ENTERPRISE_RAG_RERANK_ENABLED=true
+ENTERPRISE_RAG_RERANKER_MODE=HEURISTIC # LLM is explicit and billable
+ENTERPRISE_RAG_CONTEXTUAL_ENABLED=false # explicit opt-in, one chat call/chunk
+ENTERPRISE_RAG_AGENTIC_ENABLED=false # optional second-pass query planner
 ENTERPRISE_RAG_ADMIN_TOKEN=<独立的长随机 token>
 ```
 
@@ -64,10 +69,11 @@ ENTERPRISE_RAG_ADMIN_TOKEN=<独立的长随机 token>
 从官方 release 下载 `all_documents.zip` 后，在本地或受控 runner 运行：
 
 ```bash
+python -m pip install -r eval/requirements.txt
 python eval/enterprise_rag_worker.py --archive ./data/all_documents.zip --max-documents 1000 --dry-run
-python eval/enterprise_rag_worker.py --archive ./data/all_documents.zip --max-documents 1000 --database-url "$ENTERPRISE_DATABASE_URL" --embedding-api-key "$DASHSCOPE_API_KEY"
-python eval/enterprise_rag_worker.py --archive ./data/all_documents.zip --max-documents 5000 --database-url "$ENTERPRISE_DATABASE_URL" --embedding-api-key "$DASHSCOPE_API_KEY" --resume
-python eval/enterprise_rag_worker.py --archive ./data/all_documents.zip --max-documents 50000 --database-url "$ENTERPRISE_DATABASE_URL" --embedding-api-key "$DASHSCOPE_API_KEY" --resume
+python eval/enterprise_rag_worker.py --archive ./data/all_documents.zip --max-documents 1000 --chunk-tokens 700 --overlap-tokens 80 --database-url "$ENTERPRISE_DATABASE_URL" --embedding-api-key "$DASHSCOPE_API_KEY"
 ```
 
-worker 会拒绝 `.partial`/`.range*` 和损坏压缩包；请先 dry-run，再从 1000 开始观察 embedding 成本、WAL 和数据库容量。500K 不得跳过容量与预算 gate。
+需要 Anthropic-style LLM prefix 时额外传入 `--contextual-enabled --contextual-model qwen-plus`；这会为每个 chunk 增加一次 chat 请求，必须先在小样本评测成本和召回收益。worker 会拒绝 `.partial`/`.range*` 和损坏压缩包；请先 dry-run，再从 1000 开始观察 embedding、contextualization 成本、WAL 和数据库容量。
+
+`structure-token-contextual-v2` 会把 pipeline fingerprint 写进 checkpoint。旧 `worker-v1` checkpoint 不能使用 `--resume` 写入新 corpus；切换 chunk、overlap 或 contextual model 时必须新建 checkpoint 和 STAGING corpus。

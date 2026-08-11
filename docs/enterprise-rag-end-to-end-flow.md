@@ -260,7 +260,7 @@ flowchart LR
 | `KEYWORD` | 0 | 1 | 0 |
 | `VECTOR` | 1 | 1 | 0 |
 | `HYBRID` | 1 | 1 | 0 |
-| `HYBRID_RERANK` | 1 | 1 | 0（当前是 `NoOpReranker`） |
+| `HYBRID_RERANK` | 1 | 1 | HEURISTIC 为 0；LLM 模式增加 1 次 |
 
 LLM 是一次 HTTP streaming 请求，不是每个 token 调用一次 API；PostgreSQL 的 FTS、pgvector、RRF 都是数据库/Java 内部操作，不另收费。当前 `HYBRID` 是前端默认策略，所以一次用户提问通常是：
 
@@ -323,7 +323,7 @@ rrf_k = 60
 
 融合后保留最多 `final_top_k * 3` 个候选，再截取最多 5 个最终 chunks；总上下文默认不超过 9,000 字符。
 
-`HYBRID_RERANK` 保留 reranker 插槽；当前项目中的 `NoOpReranker` 不调用额外模型，失败时直接回退到 RRF 结果。
+`HYBRID_RERANK` 默认使用本地 HEURISTIC 重排，不调用额外模型；设置 `ENTERPRISE_RAG_RERANKER_MODE=LLM` 后使用 listwise 模型重排，失败时回退到 RRF。可选 query planner 只在首轮候选不足或问题较长时生成有限个二次查询，并复用相同 ACL。
 
 ### 3.4 Grounded generation
 

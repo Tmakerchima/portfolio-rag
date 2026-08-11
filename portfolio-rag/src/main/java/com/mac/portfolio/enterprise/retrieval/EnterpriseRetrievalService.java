@@ -118,6 +118,56 @@ public class EnterpriseRetrievalService {
                         fallback(vectorFailed, keywordFailed, rerankerFailed)));
     }
 
+    /** Merges optional rewritten-query results while enforcing exactly the same access context. */
+    public EnterpriseRetrievalResult expand(EnterpriseRetrievalResult primary,
+                                            String originalQuery,
+                                            List<String> rewrittenQueries,
+                                            EnterpriseAccessContext access,
+                                            EnterpriseRetrievalStrategy strategy) {
+        if (rewrittenQueries == null || rewrittenQueries.isEmpty()) return primary;
+        List<EnterpriseRetrievalResult> results = new ArrayList<>();
+        results.add(primary);
+        rewrittenQueries.stream()
+                .filter(query -> query != null && !query.isBlank())
+                .map(String::trim)
+                .filter(query -> !query.equalsIgnoreCase(originalQuery))
+                .distinct()
+                .forEach(query -> results.add(retrieve(query, access, strategy)));
+        if (results.size() == 1) return primary;
+
+        long rrfStarted = System.nanoTime();
+        List<EnterpriseSearchHit> merged = rrfFusion.fuseAll(
+                results.stream().map(EnterpriseRetrievalResult::hits).toList(),
+                rrfK, Math.max(finalTopK * 3, finalTopK));
+        long mergeMs = elapsedMs(rrfStarted);
+        long rerankStarted = System.nanoTime();
+        if (strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK && rerankEnabled) {
+            try {
+                merged = reranker.rerank(originalQuery, merged);
+            } catch (Exception error) {
+                log.warn("Expanded Enterprise reranker failed; using fused result: {}", error.getMessage());
+            }
+        }
+        long mergeRerankMs = strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK && rerankEnabled
+                ? elapsedMs(rerankStarted) : 0;
+        List<EnterpriseSearchHit> finalHits = limitContext(merged);
+        EnterpriseRetrievalMetrics metrics = new EnterpriseRetrievalMetrics(
+                results.stream().mapToLong(result -> result.metrics().vectorMs()).sum(),
+                results.stream().mapToLong(result -> result.metrics().ftsMs()).sum(),
+                results.stream().mapToLong(result -> result.metrics().rrfMs()).sum() + mergeMs,
+                results.stream().mapToLong(result -> result.metrics().rerankMs()).sum() + mergeRerankMs,
+                (int) results.stream().flatMap(result -> result.hits().stream())
+                        .map(EnterpriseSearchHit::chunkId).distinct().count(),
+                finalHits.size(), combineFallback(results), results.size());
+        return new EnterpriseRetrievalResult(finalHits, strategy, metrics);
+    }
+
+    private String combineFallback(List<EnterpriseRetrievalResult> results) {
+        return results.stream().map(result -> result.metrics().fallback())
+                .filter(value -> value != null && !value.isBlank())
+                .distinct().reduce((left, right) -> left + "," + right).orElse(null);
+    }
+
     private String fallback(boolean vectorFailed, boolean keywordFailed, boolean rerankerFailed) {
         if (vectorFailed && keywordFailed) return "EVIDENCE_ONLY";
         if (vectorFailed) return "FTS_ONLY";

@@ -23,6 +23,11 @@ SUPABASE_DB_PASSWORD=<secret>
 GITHUB_MCP_PAT=<optional secret>
 ENTERPRISE_RAG_ADMIN_TOKEN=<secret>
 ENTERPRISE_RAG_ACTIVE_CORPUS_ID=<validated corpus uuid>
+ENTERPRISE_RAG_MAX_CHUNK_TOKENS=700
+ENTERPRISE_RAG_CHUNK_OVERLAP_TOKENS=80
+ENTERPRISE_RAG_CONTEXTUAL_ENABLED=false
+ENTERPRISE_RAG_RERANKER_MODE=HEURISTIC
+ENTERPRISE_RAG_AGENTIC_ENABLED=false
 ```
 
 ```powershell
@@ -59,6 +64,8 @@ Invoke-WebRequest -Uri "http://localhost:8080/api/enterprise/chat" `
 - 数据库与模型密钥只能放在 Railway 服务端环境变量中。
 
 生产 Enterprise corpus 必须先写入 STAGING，完成计数/抽样/查询验收后再激活。Railway redeploy 只读取 ACTIVE corpus，不会重新切块或调用 embedding。
+
+数据库必须依次应用 V1、V2、V3。V3 后 `enterprise_chunks.content` 是原始证据，`contextual_prefix` 是生成的检索背景，`index_content` 用于 embedding/FTS。Contextualizer 与二次查询规划均默认关闭；开启会产生额外模型调用。
 
 ## 进一步阅读
 

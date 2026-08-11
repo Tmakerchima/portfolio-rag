@@ -44,7 +44,7 @@ The active corpus is selected inside SQL. A staging corpus is never sent to the 
 
 `enterprise_corpora` is the control plane. A generation moves through `STAGING → EMBEDDING → INDEXING → VALIDATING → READY → ACTIVE`. `activate_corpus` retires the old pointer in one transaction. Rollback changes the pointer and retains both generations; it does not delete rows.
 
-The V2 migration is additive and leaves the legacy `public.vector_store` untouched. Full dense ingestion is gated by Supabase capacity, backup/PITR, embedding budget and canary measurements. A 500K load is not run on the current Free project.
+The V2/V3 migrations are additive and leave the legacy `public.vector_store` untouched. V3 separates citable `content` from generated `contextual_prefix` and retrieval-only `index_content`. Full dense ingestion is gated by Supabase capacity, backup/PITR, embedding/contextualization budget and canary measurements. A 500K load is not run on the current Free project.
 
 ## Resume full-context path
 

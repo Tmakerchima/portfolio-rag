@@ -7,6 +7,7 @@ import com.mac.portfolio.enterprise.model.EnterpriseAccessContext;
 import com.mac.portfolio.enterprise.model.EnterpriseChunk;
 import com.mac.portfolio.enterprise.model.EnterpriseDocumentInput;
 import com.mac.portfolio.enterprise.model.EnterpriseDocumentRecord;
+import com.mac.portfolio.enterprise.model.EnterpriseIndexedChunk;
 import com.mac.portfolio.enterprise.model.EnterpriseSearchHit;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -36,7 +37,7 @@ public class EnterpriseDocumentRepository {
 
     public Optional<EnterpriseDocumentRecord> findBySourceAndExternalId(String source, String externalId) {
         List<EnterpriseDocumentRecord> rows = jdbcTemplate.query("""
-                SELECT document_id, external_id, source, content_hash, version, deleted_at
+                SELECT document_id, external_id, source, content_hash, index_fingerprint, version, deleted_at
                 FROM enterprise_documents
                 WHERE corpus_id = ? AND source = ? AND external_id = ?
                 """, (rs, rowNum) -> new EnterpriseDocumentRecord(
@@ -44,23 +45,26 @@ public class EnterpriseDocumentRepository {
                 rs.getString("external_id"),
                 rs.getString("source"),
                 rs.getString("content_hash"),
+                rs.getString("index_fingerprint"),
                 rs.getInt("version"),
                 rs.getTimestamp("deleted_at") != null), LEGACY_CORPUS_ID, source, externalId);
         return rows.stream().findFirst();
     }
 
-    public void upsertDocument(EnterpriseDocumentInput input, String documentId, String contentHash, int version) {
+    public void upsertDocument(EnterpriseDocumentInput input, String documentId, String contentHash,
+                               String indexFingerprint, int version) {
         jdbcTemplate.update("""
                 INSERT INTO enterprise_documents
-                    (corpus_id, document_id, external_id, source, source_type, title, content, content_hash,
+                    (corpus_id, document_id, external_id, source, source_type, title, content, content_hash, index_fingerprint,
                      version, tenant_id, department, access_level, metadata, updated_at, indexed_at, deleted_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, now(), now(), NULL)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, now(), now(), NULL)
                 ON CONFLICT (corpus_id, source, external_id) DO UPDATE SET
                     document_id = EXCLUDED.document_id,
                     source_type = EXCLUDED.source_type,
                     title = EXCLUDED.title,
                     content = EXCLUDED.content,
                     content_hash = EXCLUDED.content_hash,
+                    index_fingerprint = EXCLUDED.index_fingerprint,
                     version = EXCLUDED.version,
                     tenant_id = EXCLUDED.tenant_id,
                     department = EXCLUDED.department,
@@ -70,22 +74,24 @@ public class EnterpriseDocumentRepository {
                     indexed_at = now(),
                     deleted_at = NULL
                 """, LEGACY_CORPUS_ID, documentId, input.externalId(), input.source(), input.sourceType(), input.title(), input.content(),
-                contentHash, version, input.tenantId(), input.department(), input.accessLevel(), toJson(input.metadata()));
+                contentHash, indexFingerprint, version, input.tenantId(), input.department(), input.accessLevel(), toJson(input.metadata()));
     }
 
     public void deleteChunks(String documentId) {
         jdbcTemplate.update("DELETE FROM enterprise_chunks WHERE document_id = ?", documentId);
     }
 
-    public void insertChunk(String documentId, EnterpriseChunk chunk, String contentHash,
+    public void insertChunk(String documentId, EnterpriseIndexedChunk indexedChunk, String contentHash,
                             Map<String, Object> metadata, float[] embedding) {
+        EnterpriseChunk chunk = indexedChunk.chunk();
         jdbcTemplate.update("""
                 INSERT INTO enterprise_chunks
-                    (corpus_id, chunk_id, document_id, chunk_index, content, content_hash, token_count,
-                     metadata, embedding, search_vector)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::vector, to_tsvector('simple', ?))
-                """, LEGACY_CORPUS_ID, chunk.chunkId(), documentId, chunk.index(), chunk.content(), contentHash,
-                estimateTokenCount(chunk.content()), toJson(metadata), vectorLiteral(embedding), chunk.content());
+                    (corpus_id, chunk_id, document_id, chunk_index, content, contextual_prefix, index_content,
+                     content_hash, token_count, metadata, embedding, search_vector)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::vector, to_tsvector('simple', ?))
+                """, LEGACY_CORPUS_ID, chunk.chunkId(), documentId, chunk.index(), chunk.content(),
+                indexedChunk.contextualPrefix(), indexedChunk.indexContent(), contentHash,
+                indexedChunk.indexTokenCount(), toJson(metadata), vectorLiteral(embedding), indexedChunk.indexContent());
     }
 
     public void softDelete(String source, String externalId) {
@@ -193,7 +199,4 @@ public class EnterpriseDocumentRepository {
         return result.append(']').toString();
     }
 
-    private int estimateTokenCount(String content) {
-        return Math.max(1, content.trim().isEmpty() ? 0 : content.trim().split("\\s+").length);
-    }
 }
