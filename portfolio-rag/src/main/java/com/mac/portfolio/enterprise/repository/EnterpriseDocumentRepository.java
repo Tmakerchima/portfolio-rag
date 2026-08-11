@@ -17,9 +17,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Enterprise 文档与 Chunk 的 PostgreSQL 持久化层。
+ * 入库时同时保存原文、检索增强文本、pgvector 向量和 PostgreSQL 全文索引。
+ */
 @Repository
 public class EnterpriseDocumentRepository {
 
+    /** Java /ingest 兼容入口写入的固定 Corpus；大规模 Worker 使用独立代际 Corpus。 */
     public static final UUID LEGACY_CORPUS_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     private static final String ACL_FILTER = """
@@ -35,6 +40,7 @@ public class EnterpriseDocumentRepository {
         this.objectMapper = objectMapper;
     }
 
+    /** 使用 source + externalId 查找旧记录，供入库服务做内容和管线指纹比较。 */
     public Optional<EnterpriseDocumentRecord> findBySourceAndExternalId(String source, String externalId) {
         List<EnterpriseDocumentRecord> rows = jdbcTemplate.query("""
                 SELECT document_id, external_id, source, content_hash, index_fingerprint, version, deleted_at
@@ -51,6 +57,10 @@ public class EnterpriseDocumentRepository {
         return rows.stream().findFirst();
     }
 
+    /**
+     * 写入文档级原文和权限信息；已存在时更新同一条记录并清除 deleted_at，
+     * 因此软删除后的文档再次入库可以恢复。
+     */
     public void upsertDocument(EnterpriseDocumentInput input, String documentId, String contentHash,
                                String indexFingerprint, int version) {
         jdbcTemplate.update("""
@@ -77,10 +87,15 @@ public class EnterpriseDocumentRepository {
                 contentHash, indexFingerprint, version, input.tenantId(), input.department(), input.accessLevel(), toJson(input.metadata()));
     }
 
+    /** 重建文档索引前删除旧 Chunk，随后由同一事务写入完整的新 Chunk 集合。 */
     public void deleteChunks(String documentId) {
         jdbcTemplate.update("DELETE FROM enterprise_chunks WHERE document_id = ?", documentId);
     }
 
+    /**
+     * 插入一个最终 Chunk：content 是可引用原文，indexContent 用于 Embedding 与 FTS，
+     * contextualPrefix 单独保存，避免回答时把模型生成内容误当成来源证据。
+     */
     public void insertChunk(String documentId, EnterpriseIndexedChunk indexedChunk, String contentHash,
                             Map<String, Object> metadata, float[] embedding) {
         EnterpriseChunk chunk = indexedChunk.chunk();
@@ -94,6 +109,7 @@ public class EnterpriseDocumentRepository {
                 indexedChunk.indexTokenCount(), toJson(metadata), vectorLiteral(embedding), indexedChunk.indexContent());
     }
 
+    /** 设置 deleted_at 完成软删除；查询 SQL 会过滤这些文档。 */
     public void softDelete(String source, String externalId) {
         jdbcTemplate.update("""
                 UPDATE enterprise_documents
@@ -174,6 +190,7 @@ public class EnterpriseDocumentRepository {
 
     private String toJson(Map<String, Object> value) {
         try {
+            // PostgreSQL metadata 字段是 jsonb，因此先把 Java Map 序列化为 JSON 字符串。
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Enterprise metadata is not JSON serializable", e);
@@ -190,6 +207,7 @@ public class EnterpriseDocumentRepository {
     }
 
     static String vectorLiteral(float[] embedding) {
+        // pgvector JDBC 参数使用 [0.1,0.2,...] 文本格式后再由 SQL 转成 vector。
         if (embedding == null || embedding.length == 0) throw new IllegalArgumentException("embedding is empty");
         StringBuilder result = new StringBuilder("[");
         for (int i = 0; i < embedding.length; i++) {
