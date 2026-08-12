@@ -3,7 +3,7 @@
 一个仓库、两条刻意分开的知识问答链路：
 
 - **简历 AI Agent**：把完整 `about-mac.md` 作为静态上下文交给 Qwen；不查询向量库。博客和 GitHub 等动态信息才使用 Function Calling / MCP。
-- **EnterpriseRAG**：对 EnterpriseRAG-Bench 文档做离线切块和向量化，使用可配置的 PostgreSQL FTS / ParadeDB BM25 + PGVector + RRF 检索，再让 Qwen 基于有限证据回答。
+- **EnterpriseRAG**：对 EnterpriseRAG-Bench 文档做离线切块和向量化，当前生产索引为 V2（token-aware chunks + PGVector），使用可配置的 PostgreSQL FTS / ParadeDB BM25 + PGVector + RRF 检索，再让 Qwen 基于有限证据回答。旧 V1 generation 已退休。
 
 [EnterpriseRAG Live Site](https://enterprise-rag-frontend-seven.vercel.app/) · [个人主页](https://tmakerchima.cn/) · [GitHub](https://github.com/Tmakerchima/portfolio-rag)
 
@@ -12,14 +12,19 @@
 | 项目 | 当前值 |
 |---|---:|
 | Enterprise 文档 | 5,000 |
-| Enterprise chunks | 15,816 |
-| 已生成 embedding | 15,816 |
+| Enterprise chunks | 13,113 |
+| 已生成 embedding | 13,113 |
 | Embedding | `text-embedding-v3`, 1,024 维 |
-| Active corpus | `f5f1da84-145a-4688-bbb1-14bcdf354c9e` |
+| Active corpus (V2) | `f15c299a-30b5-4369-af0e-669ce56c6de2` |
+| V2 chunking | 700 tokens / 80-token overlap |
+| Contextualizer | disabled |
+| V1 status | retired; old rows removed |
 | 数据库 | Supabase PostgreSQL + pgvector |
 | 后端 / 前端 | Railway / Vercel |
 
 企业语料存放在 `enterprise_documents`、`enterprise_chunks` 和 `enterprise_corpora`；Supabase 中的旧 `vector_store` 不是 EnterpriseRAG-Bench 数据表。
+
+`corpus` 可以理解为一套完整、可切换的企业知识库索引版本：它包含某次导入的 documents、chunks、embeddings、模型和切块配置。查询只读取 `state = ACTIVE` 的 corpus；新版本先进入 `STAGING`，完成校验后再原子切换为 `ACTIVE`。
 
 ## 架构
 

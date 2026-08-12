@@ -110,7 +110,7 @@
 
 设计并开发当前个人网站的智能问答系统。前端使用 Vue 3 + TypeScript，通过 SSE 展示流式回答；后端使用 **Java 21、Spring Boot、Spring AI 和 WebFlux** 编排多种能力：静态简历问答直接向 LLM 提供完整的 `about-mac.md` 上下文，不执行向量检索；动态信息通过 Function Calling 查询博客，并通过 GitHub 官方远程 MCP Server 查询仓库、Issue 与 PR 等实时信息。系统会在前端标记实际调用的 Function Calling 或 MCP 工具，GitHub MCP 不可用时会容错降级，避免拖垮主问答链路。
 
-同一仓库还包含独立的 EnterpriseRAG 企业知识库演示：5,000 篇 EnterpriseRAG-Bench 文档被切成 15,816 个 chunks，存储在 Supabase PostgreSQL + pgvector，并通过向量检索、全文检索和 RRF 融合召回。个人简历问答与企业知识库使用不同的数据链路。
+同一仓库还包含独立的 EnterpriseRAG 企业知识库演示：当前生产使用 V2 generation，将 5,000 篇 EnterpriseRAG-Bench 文档切成 13,113 个 token-aware chunks（700 tokens、80-token overlap），存储在 Supabase PostgreSQL + pgvector，并通过向量检索、全文检索和 RRF 融合召回。V1 generation 已退休。个人简历问答与企业知识库使用不同的数据链路。
 
 部署链路为：前端 Vercel（https://tmakerchima.cn）、后端 Railway、企业语料数据库 Supabase PostgreSQL + pgvector。代码地址：https://github.com/Tmakerchima/portfolio-rag
 

@@ -8,12 +8,15 @@
 
 | 指标 | 当前值 |
 |---|---:|
-| Active corpus | `f5f1da84-145a-4688-bbb1-14bcdf354c9e` |
+| Active corpus (V2) | `f15c299a-30b5-4369-af0e-669ce56c6de2` |
 | documents | 5,000 |
-| chunks | 15,816 |
-| embedded chunks | 15,816 |
+| chunks | 13,113 |
+| embedded chunks | 13,113 |
 | embedding model | `text-embedding-v3` |
 | vector dimension | 1,024 |
+| chunking | 700 tokens with 80-token overlap |
+| contextualizer | disabled |
+| V1 | retired; old document/chunk rows removed |
 | database | Supabase PostgreSQL + pgvector |
 | source | `EnterpriseRAG-Bench/github_slice_0001.zip` |
 
@@ -201,7 +204,7 @@ worker 不调用受限的 HTTP canary ingestion，而是直接使用受控数据
 9. 每个文档更新 `enterprise_ingestion_jobs` 的进度。
 10. 全部成功后把 corpus 从 `STAGING` 更新为 `READY`。
 
-当前 5,000 文档 dry-run 的预期结果是 15,816 chunks；本次生产校验结果为 5,000 documents、15,816 chunks、15,816 embedded chunks。
+当前 V2 5,000 文档导入的生产校验结果为 5,000 documents、13,113 chunks、13,113 embedded chunks；chunker 使用 700-token chunks、80-token overlap，Contextualizer 关闭。
 
 ### 2.2 数据表职责
 
@@ -222,12 +225,12 @@ worker 不调用受限的 HTTP canary ingestion，而是直接使用受控数据
 | 项目 | 数值 |
 |---|---:|
 | documents | 5,000 |
-| chunks | 15,816 |
+| chunks | 13,113 |
 | embedding 文本字符数（含 contextual prefix） | 27,328,763 |
 | 估算输入 tokens（按 0.3 token/字符） | 约 8,198,629 |
 | 当前 worker embedding HTTP 请求数 | 5,000 |
 
-虽然 DashScope 单次最多接收 10 条文本，但当前 worker 在每个 document 内分批，保证单文档事务和断点语义；本批每篇文档最多 8 chunks，因此每篇恰好 1 次 embedding 请求。若将来改为跨文档全局 batching，理论请求数可接近 `ceil(15816 / 10) = 1582`，但需要重新设计事务、失败重试和文档级 checkpoint。
+虽然 DashScope 单次最多接收 10 条文本，但当前 worker 在每个 document 内分批，保证单文档事务和断点语义；如果将来改为跨文档全局 batching，理论请求数可接近 `ceil(13113 / 10) = 1312`，但需要重新设计事务、失败重试和文档级 checkpoint。
 
 DashScope 官方价格表中，`text-embedding-v3` 为约 ¥0.0005 / 1K input tokens；Batch API 价格约为 ¥0.00025 / 1K tokens。[官方 Embedding 价格](https://help.aliyun.com/en/model-studio/embedding) 当前 worker 使用同步 OpenAI-compatible API，因此按同步价格粗估：
 
@@ -450,8 +453,8 @@ VITE_API_BASE_URL=https://api.tmakerchima.cn
 GET  /api/enterprise/health                         -> READY
 数据库 enterprise_corpora                         -> ACTIVE
 documents                                          -> 5000
-chunks                                             -> 15816
-embedded_chunk_count                               -> 15816
+chunks                                             -> 13113
+embedded_chunk_count                               -> 13113
 POST /api/enterprise/chat                          -> HTTP 200
 SSE 中存在 @@SOURCES@@ 和 @@METRICS@@              -> 是
 旧 public.vector_store                              -> 未被 Enterprise 导入清空

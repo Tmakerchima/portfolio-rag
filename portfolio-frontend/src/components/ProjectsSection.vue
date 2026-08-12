@@ -22,9 +22,9 @@ const projects: Project[] = [
   {
     name: 'EnterpriseRAG · 企业知识库助手',
     period: '2026 · 个人项目',
-    tags: ['Java 21', 'Spring AI', 'PGVector', 'PostgreSQL FTS', 'RRF', 'Vue 3'],
-    highlight: '面向企业级语料的增量索引与 ACL-aware 混合检索 RAG 系统。',
-    detail: '使用 PostgreSQL Full-Text Search 与 PGVector 做双路召回，通过 HNSW、RRF 融合和可插拔 reranker 处理大规模内部知识。文档按 content hash 增量入库，检索阶段应用 tenant、department、access level 权限过滤，并通过离线评估脚本接入 EnterpriseRAG-Bench。',
+    tags: ['V2', 'Java 21', 'Python Worker', 'PGVector', 'PostgreSQL FTS', 'RRF', 'Vue 3'],
+    highlight: 'V2 企业知识库 RAG：700-token 结构化切块、向量 + 关键词混合检索，并按 ACL 控制证据范围。',
+    detail: '生产环境当前使用 V2 generation：Python Worker 离线完成 5,000 份文档的 token-aware chunking（700 tokens、80-token overlap）和 1,024 维 Embedding，Contextualizer 保持关闭以控制成本与延迟。在线查询从 ACTIVE corpus 做 PGVector + PostgreSQL FTS 双路召回，经 RRF 和可插拔 reranker 后，再让 Qwen 只基于有限原文证据回答；tenant、department、access level 权限过滤在检索阶段执行。旧 V1 generation 已退休。',
     featured: true,
     links: [
       { label: 'GitHub', href: 'https://github.com/Tmakerchima/portfolio-rag' },

@@ -6,6 +6,11 @@ spring:
     url: jdbc:postgresql://aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres
     username: postgres.odzmchhqdukwhcjccdxt
     password: ${SUPABASE_DB_PASSWORD}
+    hikari:
+      # Supabase 主库是 @Primary Hikari pool；所有普通 repository 与 pgvector 默认使用它。
+      maximum-pool-size: ${PRIMARY_DB_MAXIMUM_POOL_SIZE:10}
+      minimum-idle: ${PRIMARY_DB_MINIMUM_IDLE:1}
+      connection-timeout: ${PRIMARY_DB_CONNECTION_TIMEOUT_MS:30000}
   ai:
     openai:
       # DashScope OpenAI 兼容模式入口
@@ -83,6 +88,8 @@ enterprise:
       connect-timeout-ms: ${ENTERPRISE_RAG_BM25_CONNECT_TIMEOUT_MS:1000}
       query-timeout-ms: ${ENTERPRISE_RAG_BM25_QUERY_TIMEOUT_MS:3000}
       max-retries: ${ENTERPRISE_RAG_BM25_MAX_RETRIES:0}
+      maximum-pool-size: ${ENTERPRISE_RAG_BM25_MAXIMUM_POOL_SIZE:4}
+      minimum-idle: ${ENTERPRISE_RAG_BM25_MINIMUM_IDLE:0}
     reranker:
       # HEURISTIC changes ranking without another API call; LLM enables listwise model reranking.
       mode: ${ENTERPRISE_RAG_RERANKER_MODE:HEURISTIC}

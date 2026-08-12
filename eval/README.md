@@ -77,6 +77,28 @@ python eval/retrieval_eval.py \
 
 脚本只对存在真实 `expected_doc_ids` 的问题计算 HitRate@K、Recall@K、Precision@K、MRR、nDCG；High Level 和 Info Not Found 等没有 ground-truth document 的问题明确标记为 unsupported，不生成虚假分数。对比 `VECTOR`、`KEYWORD`、`HYBRID`、`HYBRID_RERANK` 时使用不同输出文件。
 
+最小 ablation 需要对同一 corpus 启动两次后端配置。第一次设置 `ENTERPRISE_RAG_LEXICAL_BACKEND=POSTGRES_FTS`，运行：
+
+```powershell
+python .\eval\run_ablation.py `
+  --questions .\eval\data\EnterpriseRAG-Bench\questions.jsonl `
+  --api-base http://localhost:8080 `
+  --expected-lexical-backend POSTGRES_FTS `
+  --output-dir .\eval\results\ablation-fts
+```
+
+第二次完成 ParadeDB smoke test 后，用 `ENTERPRISE_RAG_LEXICAL_BACKEND=PARADEDB_BM25` 重启 API，再运行：
+
+```powershell
+python .\eval\run_ablation.py `
+  --questions .\eval\data\EnterpriseRAG-Bench\questions.jsonl `
+  --api-base http://localhost:8080 `
+  --expected-lexical-backend PARADEDB_BM25 `
+  --output-dir .\eval\results\ablation-bm25
+```
+
+每份 prediction 都保存 API 返回的真实 `lexical_backend`。脚本覆盖 Vector only、lexical only、Vector + lexical、Vector + lexical + reranker；如果请求实际发生 `POSTGRES_FTS_FALLBACK`，manifest 会标记 `BACKEND_MISMATCH`，不会把这批结果冒充成 BM25 指标。
+
 ## 3. RAGAS（可选）
 
 RAGAS 只在线下运行。当前脚本按 Ragas 官方 `evaluate(dataset, metrics=...)` 接口构造 `question / ground_truth / answer / contexts` 列；如果当前安装的 provider、模型或 RAGAS API 不兼容，脚本会输出 `NOT_EXECUTED`，不会伪造结果。

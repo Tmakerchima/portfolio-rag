@@ -31,7 +31,7 @@ ORDER BY pdb.score(c.chunk_id) DESC, c.chunk_id ASC
 LIMIT ?
 ```
 
-这不是重命名 FTS：`|||` 触发 ParadeDB operator，`pdb.score(c.chunk_id)` 读取 ParadeDB index 的 BM25 score；该 SQL 不使用 `ts_rank_cd`。对应 index 在 `deploy/paradedb/03_paradedb_bm25_index.sql`，key field `chunk_id` 使用 `pdb.literal`，检索字段使用 `pdb.icu`。ICU 是中文、英文和技术标识符的初始折中；目标环境可用真实语料再评估 `unicode`、`chinese_compatible` 或 `source_code`。
+这不是重命名 FTS：`|||` 触发 ParadeDB operator，`pdb.score(c.chunk_id)` 读取 ParadeDB index 的 BM25 score；该 SQL 不使用 `ts_rank_cd`。对应 index 在 `deploy/paradedb/03_paradedb_bm25_index.sql`。项目固定镜像 `0.24.3-pg16`，DDL 使用 `USING bm25`；0.25+ 官方文档主推 `USING paradedb`，但仍把 `USING bm25` 保留为兼容别名。key field `chunk_id` 使用 `pdb.literal`，检索字段使用 `pdb.icu`。ICU 是中文、英文和技术标识符的初始折中；目标环境可用真实语料再评估 `unicode`、`chinese_compatible` 或 `source_code`。
 
 ## 配置
 
@@ -45,6 +45,8 @@ ENTERPRISE_RAG_BM25_TOP_K=20
 ENTERPRISE_RAG_BM25_CONNECT_TIMEOUT_MS=1000
 ENTERPRISE_RAG_BM25_QUERY_TIMEOUT_MS=3000
 ENTERPRISE_RAG_BM25_MAX_RETRIES=0
+ENTERPRISE_RAG_BM25_MAXIMUM_POOL_SIZE=4
+ENTERPRISE_RAG_BM25_MINIMUM_IDLE=0
 ```
 
 生产建议先设置 `ENTERPRISE_RAG_LEXICAL_FAIL_OPEN=true`：BM25 不可用时结果会标记 `POSTGRES_FTS_FALLBACK:BM25_*`，并继续走主库 FTS。严格环境可以设为 `false`，让配置/连接故障显式失败。快速回滚只需设置 `ENTERPRISE_RAG_LEXICAL_BACKEND=POSTGRES_FTS`，不用删除旧列或数据库索引。
@@ -52,6 +54,8 @@ ENTERPRISE_RAG_BM25_MAX_RETRIES=0
 ## ACL 与 corpus 安全
 
 ParadeDB SQL 与原有 vector/FTS 查询保持相同过滤：`deleted_at IS NULL`、`ACTIVE corpus`、admin/public/department 规则、tenant isolation。BM25 结果进入 RRF、reranker 或 LLM 前已经完成 ACL；不能先取高分再在 Java 中过滤。应用仍只写 Supabase，ParadeDB 通过 logical replication 接收 `enterprise_documents`、`enterprise_chunks`、`enterprise_corpora`，避免 dual-write 不一致。
+
+DataSource 完全隔离：Supabase `dataSource` 与 `primaryJdbcTemplate` 显式标记 `@Primary`，所有普通 repository、ingestion、corpus 与 pgvector 默认连接它；ParadeDB 使用独立 `bm25DataSource` / `bm25JdbcTemplate` qualifier。两边都是独立 Hikari pool，启用 `PARADEDB_BM25` 不会替换 Spring 主 DataSource。
 
 ## 本地运行和复制
 
@@ -78,12 +82,14 @@ psql "$env:PARADEDB_ADMIN_URL" -f ../deploy/paradedb/04_smoke_test.sql
 ```
 
 BM25 down 且 fail-open 时，`lexicalBackend` 为 `POSTGRES_FTS_FALLBACK`、`bm25` 为 `DOWN`。
+Health probe 会依次验证 ParadeDB 连接、固定 index 是否存在，并实际执行一次 `index_content ||| ? + pdb.score(chunk_id)`；只有 index 名存在但 BM25 query 不能执行时仍然返回 DOWN，且不会暴露 URL、用户名或密码。
 
 ## 测试与 benchmark
 
 - 单元测试验证 BM25 SQL 有 `|||`、`pdb.score`、`LIMIT` 且没有 `ts_rank_cd`。
 - fallback 测试模拟 ParadeDB 连接/SQL 异常，分别覆盖 fail-open 和 fail-closed。
 - contextual fixture 验证 query 中的 `ACME/Q2/2025` 只出现在 prefix 时仍由 `index_content` 召回，而 citation 仍只有原文。
+- `.github/workflows/enterprise-bm25.yml` 会启动固定版本的真实 ParadeDB container，显式开启 `ParadeDbBm25IntegrationTest`；开发机没有 Docker 时该外部测试保持 skip，不能写成 PASS。
 - `RrfFusionTest` 验证 vector 与 lexical 的 rank-based 融合，不比较两个 backend 的原始 score。
 - `eval/retrieval_eval.py` 计算 Recall@K、MRR、nDCG、HitRate、Precision；`eval/run_eval.py` 可分别运行 `VECTOR`、`KEYWORD`、`HYBRID`、`HYBRID_RERANK`。没有外部 API key 或运行数据库时应记录 skip，不得填造数字。
 

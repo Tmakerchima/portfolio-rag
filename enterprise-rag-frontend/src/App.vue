@@ -43,6 +43,7 @@ interface Health {
   vector_backend?: string
   embedding_model?: string
   embedding_dimension?: number
+  chunker_version?: string
   source_distribution?: Record<string, number>
   vector_ready?: boolean
   fts_ready?: boolean
@@ -69,8 +70,8 @@ const copy = {
     language: '语言',
     kicker: 'ENTERPRISE KNOWLEDGE / RAG',
     title: '让每一个答案，\n都有证据。',
-    lede: '面向企业内部知识的检索与问答工作台。增量索引、ACL、PostgreSQL FTS 与 PGVector，在一个清晰的证据链里协同工作。',
-    architecture: '向量 + 关键词 → 融合排序 → grounded answer',
+    lede: '面向企业内部知识的 V2 检索与问答工作台。当前 ACTIVE corpus 已完成 5,000 份文档导入，使用 700-token 结构化切块、PGVector 与 PostgreSQL FTS 构建可追溯证据链。',
+    architecture: 'V2 · 700 tokens / 80 overlap · Contextualizer off · 向量 + 关键词 → 融合排序 → grounded answer',
     queryKicker: 'QUERY CONSOLE',
     queryTitle: '向知识库提问',
     live: '在线',
@@ -81,7 +82,7 @@ const copy = {
     statusEmpty: '暂无 ACTIVE 语料',
     statusIngesting: '语料导入中',
     corpusKicker: 'CORPUS OVERVIEW',
-    corpusTitle: '当前语料状态',
+    corpusTitle: '当前 ACTIVE V2 语料',
     documents: '文档',
     expected: '目标文档',
     chunks: '切片',
@@ -111,7 +112,7 @@ const copy = {
     metricsEmpty: '回答完成后显示检索和模型耗时。',
     candidates: '候选片段',
     contextChunks: '上下文片段',
-    footer: 'EnterpriseRAG · 企业知识库检索演示',
+    footer: 'EnterpriseRAG V2 · 企业知识库检索演示 · V1 retired',
     api: 'API',
     notConfigured: '未配置',
     missingApi: '未配置后端地址。请在 Vercel 项目中设置 VITE_API_BASE_URL。',
@@ -139,8 +140,8 @@ const copy = {
     language: 'Language',
     kicker: 'ENTERPRISE KNOWLEDGE / RAG',
     title: 'Every answer\nwith evidence.',
-    lede: 'A focused workspace for searching internal knowledge. Incremental indexing, ACLs, PostgreSQL FTS and PGVector work together as one observable evidence chain.',
-    architecture: 'vector + keyword → fusion ranking → grounded answer',
+    lede: 'A focused V2 workspace for searching internal knowledge. The ACTIVE corpus contains 5,000 documents built with 700-token structured chunks, PGVector and PostgreSQL FTS as one observable evidence chain.',
+    architecture: 'V2 · 700 tokens / 80 overlap · Contextualizer off · vector + keyword → fusion ranking → grounded answer',
     queryKicker: 'QUERY CONSOLE',
     queryTitle: 'Ask the knowledge base',
     live: 'live',
@@ -151,7 +152,7 @@ const copy = {
     statusEmpty: 'no ACTIVE corpus',
     statusIngesting: 'ingestion in progress',
     corpusKicker: 'CORPUS OVERVIEW',
-    corpusTitle: 'Active corpus',
+    corpusTitle: 'Active V2 corpus',
     documents: 'documents',
     expected: 'expected',
     chunks: 'chunks',
@@ -181,7 +182,7 @@ const copy = {
     metricsEmpty: 'Retrieval and model timings appear after the answer completes.',
     candidates: 'candidates',
     contextChunks: 'context chunks',
-    footer: 'EnterpriseRAG · enterprise knowledge retrieval demo',
+    footer: 'EnterpriseRAG V2 · enterprise knowledge retrieval demo · V1 retired',
     api: 'API',
     notConfigured: 'not configured',
     missingApi: 'The backend URL is not configured. Set VITE_API_BASE_URL in the Vercel project.',
@@ -405,6 +406,7 @@ function handleEvent(event: string) {
         <div v-if="health" class="corpus-footer">
           <span>{{ t('backend') }}: {{ health.vector_backend || '—' }}</span>
           <span>{{ t('model') }}: {{ health.embedding_model || '—' }}</span>
+          <span>Chunker: {{ health.chunker_version || 'V2' }}</span>
           <span>{{ t('benchmark') }}: {{ health.benchmark?.status === 'NOT_MEASURED_YET' ? t('notMeasured') : health.benchmark?.status || t('notMeasured') }}</span>
         </div>
       </section>
