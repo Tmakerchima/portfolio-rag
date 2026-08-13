@@ -33,7 +33,7 @@ HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*$")
 FENCE_RE = re.compile(r"^\s*(```|~~~)")
 DEFAULT_EMBEDDING_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"
 DEFAULT_CONTEXTUAL_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
-CHUNKER_VERSION = "structure-token-contextual-v2"
+CHUNKER_VERSION = "structure-token-contextual-v2.1"
 _TOKEN_ENCODING = None
 
 
@@ -55,7 +55,30 @@ class BenchChunk:
     token_count: int
 
 
+@dataclass
+class PendingDocument:
+    """等待跨文档 Embedding batch 返回的完整文档状态。"""
+
+    document: BenchDocument
+    chunks: list[BenchChunk]
+    prefixes: list[str]
+    vectors: list[list[float] | None]
+
+    @property
+    def complete(self) -> bool:
+        return all(vector is not None for vector in self.vectors)
+
+
+def prefix_mode(args: argparse.Namespace) -> str:
+    """统一旧 contextual-enabled 与新 retrieval-prefix-mode 参数的语义。"""
+    mode = getattr(args, "retrieval_prefix_mode", "") or ""
+    if mode:
+        return mode.upper()
+    return "LLM" if args.contextual_enabled else "NONE"
+
+
 def parse_args() -> argparse.Namespace:
+    """解析离线导入参数；默认关闭 Contextualizer，避免无意增加每个 chunk 的 LLM 成本。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--dataset-name", default="EnterpriseRAG-Bench")
@@ -77,8 +100,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contextual-max-document-chars", type=int, default=60000)
     parser.add_argument("--contextual-max-prefix-chars", type=int, default=800)
     parser.add_argument("--contextual-fail-open", action="store_true")
+    parser.add_argument("--retrieval-prefix-mode", choices=["NONE", "STRUCTURAL", "LLM"], default="",
+                        help="NONE, deterministic STRUCTURAL metadata, or LLM contextual prefix")
     parser.add_argument("--database-url", default="")
     parser.add_argument("--corpus-id", default="")
+    parser.add_argument("--reuse-corpus-id", default="",
+                        help="reuse unchanged documents/vectors from this older corpus when fingerprints match")
     parser.add_argument("--resume", action="store_true", help="resume the durable checkpoint at --checkpoint")
     parser.add_argument("--checkpoint", type=Path, default=Path("eval/data/EnterpriseRAG-Bench/worker.sqlite3"))
     parser.add_argument("--manifest", type=Path, default=Path("eval/data/EnterpriseRAG-Bench/dataset_manifest.json"))
@@ -87,6 +114,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def reject_incomplete_archive(path: Path) -> None:
+    """在读取数据集前拒绝未完成下载或损坏 ZIP，避免把不完整语料写入新 generation。"""
     lowered = path.name.lower()
     if lowered.endswith(".partial") or ".range" in lowered:
         raise ValueError(f"refusing incomplete archive: {path}")
@@ -111,7 +139,10 @@ def external_id(member: str) -> str:
 def iter_members(path: Path) -> Iterable[tuple[str, bytes]]:
     if path.is_dir():
         for file in sorted(path.rglob("*.txt")):
-            yield str(file.relative_to(path)), file.read_bytes()
+            # 目录模式也保留 source 根目录，保证与 ZIP 中的
+            # github/file.txt 语义一致；否则直接传 github/ 目录会被识别为 unknown。
+            relative = file.relative_to(path)
+            yield str(Path(path.name) / relative), file.read_bytes()
         return
     with zipfile.ZipFile(path) as archive:
         for member in sorted(archive.infolist(), key=lambda item: item.filename):
@@ -125,6 +156,7 @@ def normalize(raw: bytes) -> str:
 
 
 def iter_documents(path: Path, source_filter: str, max_documents: int) -> Iterable[BenchDocument]:
+    """按稳定文件顺序读取文档，并生成可用于幂等 checkpoint 的 external_id/content_hash。"""
     emitted = 0
     for member, raw in iter_members(path):
         kind = source_type(member)
@@ -182,6 +214,7 @@ def section_path(title: str, headings: list[str | None]) -> str:
 
 
 def structured_blocks(document: BenchDocument) -> list[tuple[str, str]]:
+    """按 Markdown 标题、段落和 fenced code block 保留结构，生成语义候选块。"""
     blocks: list[tuple[str, str]] = []
     headings: list[str | None] = [None] * 6
     current: list[str] = []
@@ -220,6 +253,7 @@ def structured_blocks(document: BenchDocument) -> list[tuple[str, str]]:
 
 
 def chunks(document: BenchDocument, max_tokens: int, overlap: int) -> list[BenchChunk]:
+    """使用 cl100k_base token 数切块，并保证每个最终 Chunk 不超过 max_tokens。"""
     if max_tokens < 32 or overlap < 0 or overlap >= max_tokens:
         raise ValueError("chunk token size/overlap configuration is invalid")
     encoding = token_encoding()
@@ -229,13 +263,24 @@ def chunks(document: BenchDocument, max_tokens: int, overlap: int) -> list[Bench
         if len(ids) <= max_tokens:
             pieces.append((path, block))
             continue
-        step = max_tokens - overlap
-        for start in range(0, len(ids), step):
-            part = encoding.decode(ids[start:start + max_tokens]).strip()
+        start = 0
+        while start < len(ids):
+            # Decode a token window and re-count the resulting text. Tokenizer
+            # boundaries around whitespace can re-encode a decoded window with
+            # one extra token, so shrink the window until the actual text obeys
+            # the same budget used by the final Chunk invariant.
+            end = min(len(ids), start + max_tokens)
+            part = ""
+            while end > start:
+                part = encoding.decode(ids[start:end]).strip()
+                if token_count(part) <= max_tokens:
+                    break
+                end -= 1
             if part:
                 pieces.append((path, part))
-            if start + max_tokens >= len(ids):
+            if end >= len(ids):
                 break
+            start = max(start + 1, end - overlap)
 
     drafts: list[tuple[str, str]] = []
     current = ""
@@ -253,14 +298,34 @@ def chunks(document: BenchDocument, max_tokens: int, overlap: int) -> list[Bench
         prefix = ""
         if same_section:
             available = max(0, max_tokens - token_count(piece) - 2)
-            tail_tokens = encoding.encode(current, disallowed_special=())[-min(overlap, available):]
-            prefix = encoding.decode(tail_tokens).strip()
+            # Python 的 values[-0:] 等于 values[0:]；available 为 0 时必须显式
+            # 跳过切片，否则会把整个 completed 误当成 overlap，导致 Chunk 递增超限。
+            overlap_count = min(overlap, available)
+            if overlap_count > 0:
+                tail_tokens = encoding.encode(current, disallowed_special=())[-overlap_count:]
+                prefix = encoding.decode(tail_tokens).strip()
+                # Separator tokenization can differ from the arithmetic
+                # estimate; dropping overlap is safer than exceeding the hard
+                # budget when the actual candidate does not fit.
+                if token_count(prefix + "\n\n" + piece) > max_tokens:
+                    prefix = ""
         current = (prefix + "\n\n" if prefix else "") + piece
         current_section = path
     if current:
         drafts.append((current_section, current))
-    return [BenchChunk(index, content.strip(), path, token_count(content))
-            for index, (path, content) in enumerate(drafts) if content.strip()]
+    result: list[BenchChunk] = []
+    for index, (path, content) in enumerate(drafts):
+        normalized = content.strip()
+        if not normalized:
+            continue
+        # 这是防御性不变量：正常 pack 流程已经控制了大小；若未来新增
+        # 拼接逻辑破坏预算，立即失败而不是把坏索引写入数据库。
+        count = token_count(normalized)
+        if count > max_tokens:
+            raise RuntimeError(
+                f"chunk token budget exceeded: index={index}, tokens={count}, max={max_tokens}")
+        result.append(BenchChunk(index, normalized, path, count))
+    return result
 
 
 def document_context(document: BenchDocument, chunk: BenchChunk, max_chars: int) -> str:
@@ -276,8 +341,18 @@ def document_context(document: BenchDocument, chunk: BenchChunk, max_chars: int)
 
 
 def contextual_prefix(document: BenchDocument, chunk: BenchChunk, args: argparse.Namespace) -> str:
-    if not args.contextual_enabled:
+    """可选地调用 Chat LLM 生成检索前缀；默认返回空字符串，回答仍只引用原始 content。"""
+    mode = prefix_mode(args)
+    if mode == "NONE":
         return ""
+    if mode == "STRUCTURAL":
+        values = [
+            f"Title: {document.title}",
+            f"Source type: {document.source_type}",
+            f"Section: {chunk.section_path}",
+            f"External ID: {document.external_id}",
+        ]
+        return "\n".join(value for value in values if value.split(": ", 1)[-1].strip())[:args.contextual_max_prefix_chars].strip()
     payload = json.dumps({
         "model": args.contextual_model,
         "temperature": 0,
@@ -316,6 +391,7 @@ def contextual_prefix(document: BenchDocument, chunk: BenchChunk, args: argparse
 
 
 def open_checkpoint(path: Path) -> sqlite3.Connection:
+    """打开 WAL 模式 SQLite checkpoint，记录每个文档的 DONE/FAILED 状态和管线指纹。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path)
     connection.execute("PRAGMA journal_mode=WAL")
@@ -353,9 +429,24 @@ def write_manifest(path: Path, manifest: dict) -> None:
     path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def embed(texts: list[str], args: argparse.Namespace) -> list[list[float]]:
+def batched(values: list, batch_size: int) -> Iterable[list]:
+    """按上限切分列表；该函数也保证跨文档 batch 不会依赖文档边界。"""
+    if batch_size < 1:
+        raise ValueError("batch size must be positive")
+    for start in range(0, len(values), batch_size):
+        yield values[start:start + batch_size]
+
+
+def embed(texts: list[str], args: argparse.Namespace, stats: dict | None = None) -> list[list[float]]:
+    """调用 DashScope 兼容 Embedding API，并校验返回数量及 1024 维向量形状。"""
     if not args.embedding_api_key:
         raise RuntimeError("embedding API key is required for a non-dry-run")
+    if not texts:
+        return []
+    if stats is not None:
+        stats["requests"] = stats.get("requests", 0) + 1
+        stats["chunks"] = stats.get("chunks", 0) + len(texts)
+        stats.setdefault("batch_sizes", []).append(len(texts))
     payload = json.dumps({"model": args.embedding_model, "input": texts, "dimensions": args.dimensions}).encode()
     request = urllib.request.Request(args.embedding_url, data=payload, method="POST", headers={
         "Authorization": f"Bearer {args.embedding_api_key}", "Content-Type": "application/json"})
@@ -370,11 +461,14 @@ def embed(texts: list[str], args: argparse.Namespace) -> list[list[float]]:
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, KeyError, json.JSONDecodeError) as error:
             if attempt == 4:
                 raise RuntimeError(f"embedding request exhausted retries: {type(error).__name__}") from error
+            if stats is not None:
+                stats["retries"] = stats.get("retries", 0) + 1
             time.sleep(min(30, 2 ** attempt) + (attempt * 0.13))
     raise AssertionError("unreachable")
 
 
 def create_corpus(connection, args: argparse.Namespace) -> str:
+    """创建或复用 STAGING corpus；worker 永远不直接覆盖当前 ACTIVE generation。"""
     corpus_id = args.corpus_id or str(uuid.uuid4())
     connection.execute("""
         INSERT INTO enterprise_corpora
@@ -389,6 +483,7 @@ def create_corpus(connection, args: argparse.Namespace) -> str:
 
 
 def create_job(connection, corpus_id: str) -> str:
+    """记录一次可审计的导入任务，后续按文档提交进度和失败原因。"""
     job_id = str(uuid.uuid4())
     connection.execute("""
         INSERT INTO enterprise_ingestion_jobs (job_id, corpus_id, status)
@@ -399,6 +494,7 @@ def create_job(connection, corpus_id: str) -> str:
 
 
 def update_job(connection, job_id: str, document: BenchDocument, document_count: int, chunk_count: int) -> None:
+    """在每个文档事务成功后更新 archive cursor 和累计计数。"""
     connection.execute("""
         UPDATE enterprise_ingestion_jobs
         SET archive_cursor = %s, status = 'RUNNING', documents_processed = %s,
@@ -411,6 +507,7 @@ def update_job(connection, job_id: str, document: BenchDocument, document_count:
 def write_document(connection, corpus_id: str, document: BenchDocument,
                    document_chunks: list[BenchChunk], prefixes: list[str],
                    vectors: list[list[float]], index_fingerprint: str) -> None:
+    """以单文档事务写入 document 与完整 chunk 集合，避免出现半套索引。"""
     if len(document_chunks) != len(prefixes) or len(document_chunks) != len(vectors):
         raise RuntimeError("chunk, contextual prefix, and embedding counts differ")
     document_id = stable_id("doc", corpus_id, document.source_type + ":" + document.external_id)
@@ -471,7 +568,75 @@ def write_document(connection, corpus_id: str, document: BenchDocument,
             """)
 
 
+def copy_forward_document(connection, source_corpus_id: str, target_corpus_id: str,
+                          document: BenchDocument, document_chunks: list[BenchChunk],
+                          index_fingerprint: str) -> bool:
+    """在完整管线指纹一致时复制旧 document/chunks/vector，跳过重复 Embedding。"""
+    source = connection.execute("""
+        SELECT document_id, source, source_type, title, content, content_hash,
+               index_fingerprint, version, tenant_id, department, access_level, metadata
+        FROM enterprise_documents
+        WHERE corpus_id = %s AND external_id = %s AND content_hash = %s
+          AND index_fingerprint = %s AND deleted_at IS NULL
+        LIMIT 1
+        """, (source_corpus_id, document.external_id, document.content_hash, index_fingerprint)).fetchone()
+    if not source:
+        return False
+    (old_document_id, source_name, source_type_name, title, content, content_hash,
+     old_fingerprint, version, tenant_id, department, access_level, metadata) = source
+    old_chunks = connection.execute("""
+        SELECT chunk_index, content, contextual_prefix, index_content, content_hash,
+               token_count, metadata, embedding::text
+        FROM enterprise_chunks
+        WHERE corpus_id = %s AND document_id = %s AND embedding IS NOT NULL
+        ORDER BY chunk_index
+        """, (source_corpus_id, old_document_id)).fetchall()
+    if not old_chunks:
+        return False
+    if len(old_chunks) != len(document_chunks):
+        return False
+    for expected, actual in zip(document_chunks, old_chunks):
+        actual_index, _, _, _, actual_hash, _, _, _ = actual
+        if actual_index != expected.index or actual_hash != sha256(expected.content):
+            return False
+
+    document_id = stable_id("doc", target_corpus_id, document.source_type + ":" + document.external_id)
+    document_metadata = metadata if isinstance(metadata, str) else json.dumps(metadata or {})
+    with connection.transaction():
+        connection.execute("DELETE FROM enterprise_chunks WHERE corpus_id = %s AND document_id = %s",
+                           (target_corpus_id, document_id))
+        connection.execute("""
+            INSERT INTO enterprise_documents
+                (corpus_id, document_id, external_id, source, source_type, title, content, content_hash,
+                 index_fingerprint, version, tenant_id, department, access_level, metadata, indexed_at, deleted_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, now(), NULL)
+            ON CONFLICT (corpus_id, source, external_id) DO UPDATE SET
+                document_id = EXCLUDED.document_id, source_type = EXCLUDED.source_type,
+                title = EXCLUDED.title, content = EXCLUDED.content, content_hash = EXCLUDED.content_hash,
+                index_fingerprint = EXCLUDED.index_fingerprint, version = EXCLUDED.version,
+                tenant_id = EXCLUDED.tenant_id, department = EXCLUDED.department,
+                access_level = EXCLUDED.access_level, metadata = EXCLUDED.metadata,
+                indexed_at = now(), deleted_at = NULL
+            """, (target_corpus_id, document_id, document.external_id, source_name, source_type_name,
+                  title, content, content_hash, old_fingerprint, version, tenant_id, department,
+                  access_level, document_metadata))
+        for chunk_index, chunk_content, prefix, index_content, chunk_hash, token_count_value, chunk_metadata, vector in old_chunks:
+            target_chunk_id = stable_id("chunk", target_corpus_id,
+                                       document.external_id + f":{chunk_index}:{chunk_hash}")
+            metadata_value = chunk_metadata if isinstance(chunk_metadata, str) else json.dumps(chunk_metadata or {})
+            connection.execute("""
+                INSERT INTO enterprise_chunks
+                    (corpus_id, chunk_id, document_id, chunk_index, content, contextual_prefix,
+                     index_content, content_hash, token_count, metadata, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::vector)
+                ON CONFLICT (corpus_id, chunk_id) DO NOTHING
+                """, (target_corpus_id, target_chunk_id, document_id, chunk_index, chunk_content,
+                      prefix, index_content, chunk_hash, token_count_value, metadata_value, vector))
+    return True
+
+
 def ensure_staging_tables(connection, dimensions: int) -> None:
+    """建立当前连接专用的临时 COPY 表，先批量装载再原子替换文档 chunks。"""
     connection.execute("""
         CREATE TEMP TABLE IF NOT EXISTS enterprise_documents_stage (
             corpus_id uuid, document_id varchar(128), external_id varchar(512), source_type varchar(64),
@@ -489,6 +654,7 @@ def ensure_staging_tables(connection, dimensions: int) -> None:
 
 
 def finalize_corpus(connection, corpus_id: str, job_id: str) -> None:
+    """全量循环成功后汇总计数并把 corpus 从 STAGING 标记为 READY；ACTIVE 需另行显式激活。"""
     connection.execute("""
         UPDATE enterprise_corpora c SET
             state = 'READY',
@@ -505,7 +671,44 @@ def finalize_corpus(connection, corpus_id: str, job_id: str) -> None:
     connection.commit()
 
 
+def flush_embedding_queue(queue: list[tuple[PendingDocument, int, str]],
+                          pending: dict[str, PendingDocument],
+                          args: argparse.Namespace,
+                          stats: dict,
+                          connection,
+                          corpus_id: str,
+                          checkpoint: sqlite3.Connection,
+                          job_id: str,
+                          pipeline_fingerprint: str,
+                          progress: dict[str, int]) -> None:
+    """把跨文档队列的一批 index_content 向量化，并提交已完整返回的文档。"""
+    if not queue:
+        return
+    batch_size = max(1, args.batch_size)
+    batch = queue[:batch_size]
+    del queue[:batch_size]
+    vectors = embed([text for _, _, text in batch], args, stats)
+    if len(vectors) != len(batch):
+        raise RuntimeError("embedding batch result count differs from request count")
+    for (state, index, _), vector in zip(batch, vectors):
+        state.vectors[index] = vector
+
+    completed = [state for state in list(pending.values()) if state.complete]
+    for state in completed:
+        final_vectors = [vector for vector in state.vectors if vector is not None]
+        write_document(connection, corpus_id, state.document, state.chunks, state.prefixes,
+                       final_vectors, pipeline_fingerprint)
+        checkpoint.execute("INSERT OR REPLACE INTO processed VALUES (?, ?, 'DONE', '', ?)",
+                           (state.document.external_id, state.document.content_hash, int(time.time())))
+        checkpoint.commit()
+        progress["documents"] += 1
+        progress["chunks"] += len(state.chunks)
+        update_job(connection, job_id, state.document, progress["documents"], progress["chunks"])
+        pending.pop(state.document.external_id, None)
+
+
 def main() -> int:
+    """worker 主流程：校验配置 → 读取 checkpoint → 文档级 Embedding → 文档级事务 → READY。"""
     args = parse_args()
     args.database_url = args.database_url or os.environ.get("ENTERPRISE_DATABASE_URL", "")
     args.embedding_api_key = args.embedding_api_key or os.environ.get("DASHSCOPE_API_KEY", "")
@@ -517,7 +720,7 @@ def main() -> int:
     if args.dimensions != 1024:
         print("Current enterprise migration is vector(1024); use --dimensions 1024 or add a matching migration", file=sys.stderr)
         return 2
-    if args.contextual_enabled and not args.dry_run and not args.contextual_api_key:
+    if prefix_mode(args) == "LLM" and not args.dry_run and not args.contextual_api_key:
         print("--contextual-api-key, ENTERPRISE_RAG_CONTEXTUAL_API_KEY, or DASHSCOPE_API_KEY is required", file=sys.stderr)
         return 2
     if args.contextual_max_document_chars < 2000 or args.contextual_max_prefix_chars < 100:
@@ -531,11 +734,11 @@ def main() -> int:
         "overlap_tokens": args.overlap_tokens,
         "embedding_model": args.embedding_model,
         "embedding_dimensions": args.dimensions,
-        "contextual_enabled": args.contextual_enabled,
-        "contextual_model": args.contextual_model if args.contextual_enabled else "",
-        "contextual_url": args.contextual_url if args.contextual_enabled else "",
-        "contextual_max_document_chars": args.contextual_max_document_chars if args.contextual_enabled else 0,
-        "contextual_max_prefix_chars": args.contextual_max_prefix_chars if args.contextual_enabled else 0
+        "retrieval_prefix_mode": prefix_mode(args),
+        "contextual_model": args.contextual_model if prefix_mode(args) == "LLM" else "",
+        "contextual_url": args.contextual_url if prefix_mode(args) == "LLM" else "",
+        "contextual_max_document_chars": args.contextual_max_document_chars if prefix_mode(args) == "LLM" else 0,
+        "contextual_max_prefix_chars": args.contextual_max_prefix_chars if prefix_mode(args) != "NONE" else 0
     }, sort_keys=True))
     checkpoint_fingerprint = checkpoint_value(checkpoint, "pipeline_fingerprint")
     if args.resume and checkpoint_fingerprint != pipeline_fingerprint:
@@ -546,10 +749,14 @@ def main() -> int:
     manifest = {"dataset_name": args.dataset_name, "dataset_version": args.dataset_version,
                 "archive": str(args.archive), "chunker_version": CHUNKER_VERSION,
                 "chunk_tokens": args.chunk_tokens, "overlap_tokens": args.overlap_tokens,
-                "contextual_enabled": args.contextual_enabled,
-                "contextual_model": args.contextual_model if args.contextual_enabled else "",
+                "contextual_enabled": prefix_mode(args) == "LLM",
+                "retrieval_prefix_mode": prefix_mode(args),
+                "contextual_model": args.contextual_model if prefix_mode(args) == "LLM" else "",
                 "pipeline_fingerprint": pipeline_fingerprint,
                 "document_count": 0, "chunk_count": 0, "total_chars": 0, "source_counts": {},
+                "embedding_requests": 0, "embedding_requests_estimate": 0,
+                "embedding_retries": 0, "embedding_batch_sizes": [],
+                "reused_documents": 0, "reused_chunks": 0,
                 "sha256": sha256_file(args.archive) if args.archive.is_file() else "directory-manifest-required"}
     connection = None
     corpus_id = args.corpus_id
@@ -569,6 +776,12 @@ def main() -> int:
             print("Install psycopg[binary] before a database run", file=sys.stderr)
             return 2
         connection = psycopg.connect(args.database_url)
+        if args.reuse_corpus_id:
+            reuse_state = connection.execute(
+                "SELECT state FROM enterprise_corpora WHERE corpus_id = %s", (args.reuse_corpus_id,)
+            ).fetchone()
+            if not reuse_state or reuse_state[0] not in {"ACTIVE", "READY", "RETIRED"}:
+                raise RuntimeError("--reuse-corpus-id must reference an existing READY/ACTIVE/RETIRED corpus")
         if args.resume:
             corpus_id = corpus_id or checkpoint_corpus_id
             corpus_state = connection.execute(
@@ -593,31 +806,52 @@ def main() -> int:
         set_checkpoint_value(checkpoint, "job_id", job_id)
         ensure_staging_tables(connection, args.dimensions)
 
+    embedding_stats = {"requests": 0, "retries": 0, "chunks": 0, "batch_sizes": []}
+    pending: dict[str, PendingDocument] = {}
+    embedding_queue: list[tuple[PendingDocument, int, str]] = []
+    progress = {"documents": 0, "chunks": 0}
+    dry_run_chunk_count = 0
+
+    # 读取和切块仍按文档顺序进行，但 Embedding 队列允许跨文档凑满 batch。
     for document in iter_documents(args.archive, args.source_type, args.max_documents):
         document_chunks = chunks(document, args.chunk_tokens, args.overlap_tokens)
         manifest["document_count"] += 1
         manifest["chunk_count"] += len(document_chunks)
         manifest["total_chars"] += len(document.content)
         manifest["source_counts"][document.source_type] = manifest["source_counts"].get(document.source_type, 0) + 1
+        # resume 只跳过 external_id 与 content_hash 都未变化且已经 DONE 的文档，防止旧数据误混入新管线。
         previous = checkpoint.execute("SELECT status, content_hash FROM processed WHERE external_id = ?", (document.external_id,)).fetchone() if args.resume else None
         if args.resume and previous and previous[0] == "DONE" and previous[1] == document.content_hash:
             continue
         try:
             if not args.dry_run:
+                if args.reuse_corpus_id and copy_forward_document(
+                        connection, args.reuse_corpus_id, corpus_id, document,
+                        document_chunks, pipeline_fingerprint):
+                    manifest["reused_documents"] += 1
+                    manifest["reused_chunks"] += len(document_chunks)
+                    checkpoint.execute("INSERT OR REPLACE INTO processed VALUES (?, ?, 'DONE', 'REUSED', ?)",
+                                       (document.external_id, document.content_hash, int(time.time())))
+                    checkpoint.commit()
+                    progress["documents"] += 1
+                    progress["chunks"] += len(document_chunks)
+                    update_job(connection, job_id, document, progress["documents"], progress["chunks"])
+                    continue
+                # Contextualization和远程 Embedding 都在数据库事务之外完成；
+                # 只有一个文档的所有向量齐全后才进入 write_document 事务。
                 prefixes = [contextual_prefix(document, chunk, args) for chunk in document_chunks]
-                texts = [(prefix + "\n\n" if prefix else "") + chunk.content
-                         for chunk, prefix in zip(document_chunks, prefixes)]
-                vectors = []
-                for start in range(0, len(texts), max(1, args.batch_size)):
-                    vectors.extend(embed(texts[start:start + max(1, args.batch_size)], args))
-                write_document(connection, corpus_id, document, document_chunks, prefixes, vectors,
-                               pipeline_fingerprint)
-            checkpoint.execute("INSERT OR REPLACE INTO processed VALUES (?, ?, 'DONE', '', ?)",
-                               (document.external_id, document.content_hash, int(time.time())))
-            checkpoint.commit()
-            if connection:
-                update_job(connection, job_id, document, manifest["document_count"], manifest["chunk_count"])
-        except Exception as error:  # checkpoint the item, then stop; --resume is explicit and deterministic.
+                state = PendingDocument(document, document_chunks, prefixes, [None] * len(document_chunks))
+                pending_key = document.source_type + ":" + document.external_id
+                pending[pending_key] = state
+                for index, (chunk, prefix) in enumerate(zip(document_chunks, prefixes)):
+                    embedding_queue.append((state, index, (prefix + "\n\n" if prefix else "") + chunk.content))
+                while len(embedding_queue) >= max(1, args.batch_size):
+                    flush_embedding_queue(embedding_queue, pending, args, embedding_stats,
+                                          connection, corpus_id, checkpoint, job_id,
+                                          pipeline_fingerprint, progress)
+            else:
+                dry_run_chunk_count += len(document_chunks)
+        except Exception as error:  # 记录失败文档并停止；--resume 保证重试是显式且确定性的。
             checkpoint.execute("INSERT OR REPLACE INTO processed VALUES (?, ?, 'FAILED', ?, ?)",
                                (document.external_id, document.content_hash, type(error).__name__, int(time.time())))
             checkpoint.commit()
@@ -631,6 +865,24 @@ def main() -> int:
         if manifest["document_count"] % 100 == 0:
             write_manifest(args.manifest, manifest)
             print(f"processed {manifest['document_count']} documents", flush=True)
+
+    if args.dry_run:
+        batch_size = max(1, args.batch_size)
+        manifest["embedding_requests_estimate"] = (dry_run_chunk_count + batch_size - 1) // batch_size
+        manifest["embedding_batch_sizes"] = [batch_size] * (dry_run_chunk_count // batch_size)
+        if dry_run_chunk_count % batch_size:
+            manifest["embedding_batch_sizes"].append(dry_run_chunk_count % batch_size)
+    else:
+        # 处理不足一个 batch 的尾部；完成后不应再有未写入的 pending document。
+        while embedding_queue:
+            flush_embedding_queue(embedding_queue, pending, args, embedding_stats,
+                                  connection, corpus_id, checkpoint, job_id,
+                                  pipeline_fingerprint, progress)
+        if pending:
+            raise RuntimeError("embedding queue drained but some documents have incomplete vectors")
+        manifest["embedding_requests"] = embedding_stats["requests"]
+        manifest["embedding_retries"] = embedding_stats["retries"]
+        manifest["embedding_batch_sizes"] = embedding_stats["batch_sizes"]
     manifest["status"] = "DRY_RUN_COMPLETE" if args.dry_run else "STAGING_LOAD_COMPLETE"
     manifest["corpus_id"] = corpus_id
     if connection:

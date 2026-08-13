@@ -60,6 +60,22 @@ python .\eval\import_enterprise_bench.py `
 
 ## 2. Retrieval 指标
 
+### 2.0 先按当前 corpus 过滤问题
+
+`questions.jsonl` 是完整 benchmark，而本地 5,000 文档切片只覆盖其中一部分。先从
+目标 ACTIVE corpus 只读导出 `external_id`，再分类问题，避免把数据库中不存在的 gold
+document 误算为检索失败：
+
+```powershell
+python .\eval\filter_questions.py `
+  --questions .\eval\data\EnterpriseRAG-Bench\questions.jsonl `
+  --document-ids .\eval\results\active-external-ids.txt `
+  --output-dir .\eval\results\questions-current-corpus
+```
+
+只把 `fully_supported.jsonl` 用于严格的 Recall/MRR/nDCG 对比；
+`partially_supported` 和 `unsupported` 单独报告，不混入主指标。
+
 准备官方 `questions.jsonl` 后运行：
 
 ```bash

@@ -45,9 +45,17 @@ public class EnterpriseAdminController {
     public record IngestRequest(List<EnterpriseDocumentInput> documents) {}
 
     /**
-     * 手动批量入库接口：POST /api/enterprise/admin/ingest。
-     * 调用方必须同时提交管理请求头和 documents JSON；该方法不会在应用启动时执行。
+     * 兼容性入库接口：POST /api/enterprise/admin/ingest。
+     *
+     * <p>该接口只适合小规模 canary 或人工验证：请求体一次性携带 documents，
+     * 会在 Spring Boot 进程中同步完成切块、Embedding 和数据库写入。
+     * 生产级全量导入应使用 {@code eval/enterprise_rag_worker.py}，因为 Python worker
+     * 提供 SQLite checkpoint、逐文档恢复、STAGING generation 和长任务脱离 HTTP 的能力。</p>
+     *
+     * <p>接口暂时保留是为了兼容已有调用方，因此标记为 {@link Deprecated}，
+     * 而不是立即删除。废弃不等于当前请求会自动转发到 Python worker。</p>
      */
+    @Deprecated(since = "V2", forRemoval = false)
     @PostMapping("/ingest")
     public ResponseEntity<?> ingest(
             @RequestHeader(name = "X-Enterprise-Admin-Token", required = false) String requestToken,

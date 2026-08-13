@@ -70,6 +70,10 @@ enterprise:
     final-top-k: ${ENTERPRISE_RAG_FINAL_TOP_K:5}
     rrf-k: ${ENTERPRISE_RAG_RRF_K:60}
     max-context-chars: ${ENTERPRISE_RAG_MAX_CONTEXT_CHARS:9000}
+    # 字符数只是兼容旧配置；真正发送给 Chat LLM 的证据同时受 Token 预算约束。
+    max-context-tokens: ${ENTERPRISE_RAG_MAX_CONTEXT_TOKENS:2200}
+    # 避免重叠 Chunk 占满上下文；仅在候选来自同一文档时生效。
+    max-chunks-per-document: ${ENTERPRISE_RAG_MAX_CHUNKS_PER_DOCUMENT:2}
     similarity-threshold: ${ENTERPRISE_RAG_SIMILARITY_THRESHOLD:0.20}
     strategy: ${ENTERPRISE_RAG_STRATEGY:HYBRID}
     rerank-enabled: ${ENTERPRISE_RAG_RERANK_ENABLED:true}

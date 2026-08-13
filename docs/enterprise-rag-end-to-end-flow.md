@@ -461,3 +461,15 @@ SSE 中存在 @@SOURCES@@ 和 @@METRICS@@              -> 是
 ```
 
 当前已验证问题：`What are the default limits for multipart uploads?`。生产返回 HTTP 200，并返回了 multipart 相关来源、流式答案和 vector/FTS/RRF/LLM metrics。
+# V2.1 Upgrade Notes
+
+当前离线 Worker 的 V2.1 改造包括：
+
+- `structure-token-contextual-v2.1`：最终 Chunk 严格不超过配置 Token 上限，修复 overlap 为 0 时的 `[-0:]` 累积 Bug。
+- 跨文档 Embedding batching：默认按 `--batch-size` 凑批，单文档数据库事务和 checkpoint 语义保持不变。
+- `--retrieval-prefix-mode NONE|STRUCTURAL|LLM`：默认 NONE；STRUCTURAL 只使用标题、来源和章节等确定性字段，不产生 LLM 成本。
+- `--reuse-corpus-id`：只有正文、完整 pipeline fingerprint、Chunk 数量/顺序/hash 都一致时才复制旧向量。
+- Chat context：默认 2,200 tokens，单文档最多 2 个 Chunk；旧 `max-context-chars` 仍作为兼容上限。
+- `eval/filter_questions.py`：根据 ACTIVE corpus 的 external_id 将 benchmark 问题分为 fully/partially/unsupported，避免不在语料中的 gold 文档污染 Recall。
+
+V2.1 仍必须先写入 STAGING，验证通过后才可进入 READY；Activate、Retire、Delete 和真实付费 Embedding 都是独立的人工批准动作。

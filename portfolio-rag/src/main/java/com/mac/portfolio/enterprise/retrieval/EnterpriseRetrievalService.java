@@ -7,6 +7,8 @@ import com.mac.portfolio.enterprise.repository.EnterpriseDocumentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.tokenizer.JTokkitTokenCountEstimator;
+import org.springframework.ai.tokenizer.TokenCountEstimator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,8 +31,11 @@ public class EnterpriseRetrievalService {
     private final int finalTopK;
     private final int rrfK;
     private final int maxContextChars;
+    private final int maxContextTokens;
+    private final int maxChunksPerDocument;
     private final double similarityThreshold;
     private final boolean rerankEnabled;
+    private final TokenCountEstimator tokenEstimator;
 
     /**
      * 兼容旧的单元测试/内部调用：旧构造器自动包一层 PostgreSQL FTS。
@@ -49,7 +54,8 @@ public class EnterpriseRetrievalService {
             double similarityThreshold,
             boolean rerankEnabled) {
         this(repository, new PostgresFtsLexicalRetriever(repository), embeddingModel, rrfFusion, reranker,
-                vectorTopK, keywordTopK, finalTopK, rrfK, maxContextChars, similarityThreshold, rerankEnabled);
+                vectorTopK, keywordTopK, finalTopK, rrfK, maxContextChars, 2200, 2,
+                similarityThreshold, rerankEnabled);
     }
 
     @Autowired
@@ -64,6 +70,8 @@ public class EnterpriseRetrievalService {
             @Value("${enterprise.rag.final-top-k:5}") int finalTopK,
             @Value("${enterprise.rag.rrf-k:60}") int rrfK,
             @Value("${enterprise.rag.max-context-chars:9000}") int maxContextChars,
+            @Value("${enterprise.rag.max-context-tokens:2200}") int maxContextTokens,
+            @Value("${enterprise.rag.max-chunks-per-document:2}") int maxChunksPerDocument,
             @Value("${enterprise.rag.similarity-threshold:0.20}") double similarityThreshold,
             @Value("${enterprise.rag.rerank-enabled:true}") boolean rerankEnabled) {
         this.repository = repository;
@@ -76,10 +84,22 @@ public class EnterpriseRetrievalService {
         this.finalTopK = finalTopK;
         this.rrfK = rrfK;
         this.maxContextChars = maxContextChars;
+        if (maxContextTokens < 128) throw new IllegalArgumentException("max context tokens must be at least 128");
+        if (maxChunksPerDocument < 1) throw new IllegalArgumentException("max chunks per document must be positive");
+        this.maxContextTokens = maxContextTokens;
+        this.maxChunksPerDocument = maxChunksPerDocument;
         this.similarityThreshold = similarityThreshold;
         this.rerankEnabled = rerankEnabled;
+        this.tokenEstimator = new JTokkitTokenCountEstimator();
     }
 
+    /**
+     * 执行一次受 ACL 约束的候选召回。
+     *
+     * <p>VECTOR 使用 query embedding + pgvector，KEYWORD 使用当前配置的 lexical backend，
+     * HYBRID 对两路排名执行 RRF，HYBRID_RERANK 再对有限候选执行 reranker。
+     * 各路 repository 查询必须在数据库层筛选 ACTIVE corpus、软删除和权限字段。</p>
+     */
     public EnterpriseRetrievalResult retrieve(String query, EnterpriseAccessContext access,
                                               EnterpriseRetrievalStrategy strategy) {
         String safeQuery = query == null ? "" : query.trim();
@@ -92,6 +112,7 @@ public class EnterpriseRetrievalService {
         long vectorMs = 0;
         long ftsMs = 0;
 
+        // 只有需要语义检索的策略才调用 Embedding；向量失败时记录 fallback，不伪造结果。
         if (strategy == EnterpriseRetrievalStrategy.VECTOR || strategy == EnterpriseRetrievalStrategy.HYBRID
                 || strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK) {
             long started = System.nanoTime();
@@ -106,6 +127,7 @@ public class EnterpriseRetrievalService {
             }
         }
 
+        // KEYWORD 代表配置的 lexical backend：当前生产是 PostgreSQL FTS，未来可切 ParadeDB BM25。
         if (strategy == EnterpriseRetrievalStrategy.KEYWORD || strategy == EnterpriseRetrievalStrategy.HYBRID
                 || strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK) {
             long started = System.nanoTime();
@@ -121,6 +143,7 @@ public class EnterpriseRetrievalService {
             }
         }
 
+        // 向量 cosine 分数与 FTS/BM25 分数不在同一量纲，混合时只融合排名而不直接相加分数。
         long rrfStarted = System.nanoTime();
         List<EnterpriseSearchHit> candidates;
         if (strategy == EnterpriseRetrievalStrategy.VECTOR) candidates = vectorHits;
@@ -129,6 +152,7 @@ public class EnterpriseRetrievalService {
         else candidates = rrfFusion.fuse(vectorHits, keywordHits, rrfK, Math.max(finalTopK * 3, finalTopK));
         long rrfMs = elapsedMs(rrfStarted);
 
+        // reranker 只处理已经完成 ACL 过滤的有限候选；失败时保留 RRF 顺序。
         long rerankStarted = System.nanoTime();
         if (strategy == EnterpriseRetrievalStrategy.HYBRID_RERANK && rerankEnabled) {
             try {
@@ -147,7 +171,8 @@ public class EnterpriseRetrievalService {
         return new EnterpriseRetrievalResult(finalHits, strategy,
                 new EnterpriseRetrievalMetrics(vectorMs, ftsMs, rrfMs, rerankMs,
                         distinctCount(vectorHits, keywordHits), finalHits.size(),
-                        retrievalFallback, 1, lexicalResult.backend()));
+                        retrievalFallback, 1, lexicalResult.backend(),
+                        contextTokenCount(finalHits), distinctDocuments(finalHits)));
     }
 
     /** Merges optional rewritten-query results while enforcing exactly the same access context. */
@@ -190,7 +215,8 @@ public class EnterpriseRetrievalService {
                 results.stream().mapToLong(result -> result.metrics().rerankMs()).sum() + mergeRerankMs,
                 (int) results.stream().flatMap(result -> result.hits().stream())
                         .map(EnterpriseSearchHit::chunkId).distinct().count(),
-                finalHits.size(), combineFallback(results), results.size(), combineLexicalBackend(results));
+                finalHits.size(), combineFallback(results), results.size(), combineLexicalBackend(results),
+                contextTokenCount(finalHits), distinctDocuments(finalHits));
         return new EnterpriseRetrievalResult(finalHits, strategy, metrics);
     }
 
@@ -224,19 +250,59 @@ public class EnterpriseRetrievalService {
     private List<EnterpriseSearchHit> limitContext(List<EnterpriseSearchHit> candidates) {
         List<EnterpriseSearchHit> result = new ArrayList<>();
         int chars = 0;
+        int tokens = 0;
+        java.util.Map<String, Integer> perDocument = new java.util.HashMap<>();
         for (EnterpriseSearchHit candidate : candidates) {
             if (result.size() >= finalTopK || chars >= maxContextChars) break;
+            int documentCount = perDocument.getOrDefault(candidate.documentId(), 0);
+            if (documentCount >= maxChunksPerDocument) continue;
             int remaining = maxContextChars - chars;
             String content = candidate.content();
             if (content.length() > remaining) content = content.substring(0, remaining);
             if (content.isBlank()) continue;
+            int candidateTokens = tokenEstimator.estimate(content);
+            if (candidateTokens <= 0 || tokens + candidateTokens > maxContextTokens) {
+                int tokenBudget = maxContextTokens - tokens;
+                if (tokenBudget <= 0) break;
+                content = truncateToTokens(content, tokenBudget);
+                candidateTokens = tokenEstimator.estimate(content);
+            }
+            if (content.isBlank() || candidateTokens <= 0) continue;
             result.add(new EnterpriseSearchHit(candidate.chunkId(), candidate.documentId(), candidate.externalId(),
                     candidate.source(), candidate.sourceType(), candidate.title(), content, candidate.tenantId(),
                     candidate.department(), candidate.accessLevel(), candidate.chunkIndex(), candidate.score(),
                     result.size() + 1, candidate.metadata()));
             chars += content.length();
+            tokens += candidateTokens;
+            perDocument.merge(candidate.documentId(), 1, Integer::sum);
         }
         return List.copyOf(result);
+    }
+
+    private String truncateToTokens(String value, int budget) {
+        if (tokenEstimator.estimate(value) <= budget) return value;
+        int low = 1;
+        int high = value.length();
+        int best = 0;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            String candidate = value.substring(0, mid);
+            if (tokenEstimator.estimate(candidate) <= budget) {
+                best = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return best == 0 ? "" : value.substring(0, best).stripTrailing();
+    }
+
+    private int contextTokenCount(List<EnterpriseSearchHit> hits) {
+        return hits.stream().mapToInt(hit -> tokenEstimator.estimate(hit.content())).sum();
+    }
+
+    private int distinctDocuments(List<EnterpriseSearchHit> hits) {
+        return (int) hits.stream().map(EnterpriseSearchHit::documentId).distinct().count();
     }
 
     private int distinctCount(List<EnterpriseSearchHit> vectorHits, List<EnterpriseSearchHit> keywordHits) {

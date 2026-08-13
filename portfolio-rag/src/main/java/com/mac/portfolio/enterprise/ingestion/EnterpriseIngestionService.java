@@ -63,9 +63,20 @@ public class EnterpriseIngestionService {
         this(repository, chunker, contextualizer, embeddingModel, maxDocuments, "test-model", 0);
     }
 
-    /** 在一个事务中处理单份文档；异常时不会留下只写了一半的新 Chunk。 */
+    /**
+     * 兼容性单文档入库编排。
+     *
+     * <p>这是旧 Java HTTP canary 使用的同步路径，不是当前 5,000 文档生产导入路径。
+     * 当前大批量任务由 Python worker 在独立进程中执行；保留此方法是为了兼容小规模
+     * 管理调用和已有测试。方法级事务保证 Embedding 成功后才替换该文档的完整 Chunk 集合。</p>
+     *
+     * @deprecated V2 生产批量导入请使用 {@code eval/enterprise_rag_worker.py}；
+     *             Java 入口仅用于小规模 canary/兼容调用。
+     */
+    @Deprecated(since = "V2", forRemoval = false)
     @Transactional
     public IngestionResult ingest(EnterpriseDocumentInput input) {
+        // 整个方法的核心不变量：外部 Embedding 未成功前，不修改当前文档的持久化索引。
         // 步骤 1：统一换行、BOM 和行尾空格，避免格式差异导致无意义的重复入库。
         String normalizedContent = EnterpriseDocumentChunker.normalize(input.content());
         EnterpriseDocumentInput normalized = new EnterpriseDocumentInput(
@@ -142,7 +153,15 @@ public class EnterpriseIngestionService {
         return new IngestionResult(documentId, chunks.size(), status, version);
     }
 
-    /** 批量入口：限制一次 HTTP 请求的文档数，并逐份收集成功/跳过结果。 */
+    /**
+     * 兼容性 HTTP 批量入口的服务实现。
+     *
+     * <p>它把一批文档逐份交给 {@link #ingest(EnterpriseDocumentInput)}，
+     * 适合小批量验证，不适合长时间运行的全量任务；大批量任务应使用 Python worker。</p>
+     *
+     * @deprecated V2 生产批量导入请使用 {@code eval/enterprise_rag_worker.py}。
+     */
+    @Deprecated(since = "V2", forRemoval = false)
     @Transactional
     public BatchIngestionResult ingestBatch(List<EnterpriseDocumentInput> documents) {
         if (documents == null || documents.isEmpty()) return new BatchIngestionResult(0, 0, 0, List.of());

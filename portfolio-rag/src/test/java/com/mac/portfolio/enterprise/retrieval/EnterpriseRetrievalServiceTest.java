@@ -90,6 +90,33 @@ class EnterpriseRetrievalServiceTest {
         verify(repository).searchKeyword("exact billing term", access, 12);
     }
 
+    @Test
+    void contextBudgetLimitsRepeatedChunksFromOneDocument() {
+        EnterpriseDocumentRepository repository = mock(EnterpriseDocumentRepository.class);
+        EmbeddingModel embeddingModel = mock(EmbeddingModel.class);
+        EnterpriseSearchHit first = hit("first", "alpha evidence");
+        EnterpriseSearchHit second = new EnterpriseSearchHit("second", "doc-shared", "shared", "bench",
+                "github", "Title", "beta evidence", "default", "engineering", "public", 1, 0.7, 2, Map.of());
+        EnterpriseSearchHit third = new EnterpriseSearchHit("third", "doc-shared", "shared", "bench",
+                "github", "Title", "gamma evidence", "default", "engineering", "public", 2, 0.6, 3, Map.of());
+        EnterpriseSearchHit fourth = new EnterpriseSearchHit("fourth", "doc-shared", "shared", "bench",
+                "github", "Title", "epsilon evidence", "default", "engineering", "public", 3, 0.55, 4, Map.of());
+        EnterpriseSearchHit other = new EnterpriseSearchHit("other", "doc-other", "other", "bench",
+                "github", "Title", "delta evidence", "default", "engineering", "public", 0, 0.5, 4, Map.of());
+        when(embeddingModel.embed(anyString())).thenReturn(new float[]{0.1f});
+        when(repository.searchVector(any(), any(), eq(12), eq(0.2)))
+                .thenReturn(List.of(first, second, third, fourth, other));
+
+        EnterpriseRetrievalResult result = service(repository, embeddingModel, new NoOpReranker())
+                .retrieve("query", EnterpriseAccessContext.from("engineering", "default"),
+                        EnterpriseRetrievalStrategy.VECTOR);
+
+        assertThat(result.hits()).extracting(EnterpriseSearchHit::chunkId)
+                .containsExactly("first", "second", "third", "other");
+        assertThat(result.metrics().uniqueDocumentCount()).isEqualTo(3);
+        assertThat(result.metrics().contextTokenCount()).isLessThanOrEqualTo(2200);
+    }
+
     private EnterpriseRetrievalService service(EnterpriseDocumentRepository repository,
                                                EmbeddingModel embeddingModel,
                                                Reranker reranker) {
