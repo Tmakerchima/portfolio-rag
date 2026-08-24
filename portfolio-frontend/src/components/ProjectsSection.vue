@@ -108,87 +108,77 @@ const projects: Project[] = [
 </script>
 
 <template>
-  <section id="projects" class="py-24 border-t border-[#eeeeee] dark:border-[#222222]">
-    <h2 class="text-[42px] md:text-[48px] font-bold text-[#111111] dark:text-[#f5f5f5] mb-4">
-      Projects
-    </h2>
-    <p class="mb-12 max-w-[680px] text-sm leading-relaxed text-[#777777] dark:text-[#999999]">
-      从企业级 Java 系统到可上线的 AI 产品：既关注工程稳定性，也关注模型能力如何进入真实工作流。
-    </p>
+  <section id="projects" class="editorial-section projects-section" aria-labelledby="projects-title">
+    <div class="section-aside">
+      <p class="section-index">01</p>
+      <p class="section-label">Selected work</p>
+    </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <article
-        v-for="(p, i) in projects"
-        :key="p.name"
-        class="border p-6 cursor-pointer group
-               hover:border-[#0C447C] dark:hover:border-[#5499E0]
-               transition-all duration-200 hover:-translate-y-0.5"
-        :class="p.featured
-          ? 'border-[#bdd2e6] bg-[#f8fbfe] dark:border-[#29445f] dark:bg-[#0d141c]'
-          : 'border-[#eeeeee] dark:border-[#222222]'"
-        @click="expanded = expanded === i ? null : i"
-      >
-        <!-- 项目名 + 时间 -->
-        <div class="flex justify-between items-start mb-3">
-          <div>
-            <span
-              v-if="p.featured"
-              class="mb-2 inline-block text-[10px] font-bold tracking-[0.16em] text-[#0C447C] dark:text-[#78b7f5]"
-            >
-              AI PROJECT
-            </span>
-            <h3 class="text-lg font-bold text-[#111111] dark:text-[#f5f5f5]">{{ p.name }}</h3>
-          </div>
-          <span class="text-xs text-[#999999] ml-4 shrink-0">{{ p.period }}</span>
-        </div>
-
-        <!-- 技术栈胶囊 -->
-        <div class="flex flex-wrap gap-2 mb-4">
-          <span
-            v-for="tag in p.tags"
-            :key="tag"
-            class="px-2 py-1 text-xs bg-[#f5f5f5] dark:bg-[#1a1a1a]
-                   text-[#0C447C] dark:text-[#5499E0]"
-          >
-            {{ tag }}
-          </span>
-        </div>
-
-        <!-- 一句话亮点 -->
-        <p class="text-sm text-[#444444] dark:text-[#aaaaaa] leading-relaxed">
-          {{ p.highlight }}
+    <div class="section-body">
+      <div class="section-heading-row projects-heading">
+        <h2 id="projects-title" class="section-title">Systems built for<br />the real world.</h2>
+        <p class="section-intro">
+          从企业级 Java 系统到可上线的 AI 产品。关注工程稳定性，也关注模型能力如何进入真实工作流。
         </p>
+      </div>
 
-        <!-- 展开详情 -->
-        <div
-          v-if="expanded === i"
-          class="mt-4 pt-4 border-t border-[#eeeeee] dark:border-[#222222]
-                 text-sm text-[#666666] dark:text-[#888888] leading-relaxed"
+      <div class="project-index">
+        <article
+          v-for="(p, i) in projects"
+          :key="p.name"
+          class="project-row"
+          :class="{ 'is-expanded': expanded === i }"
         >
-          {{ p.detail }}
-        </div>
+          <button
+            class="project-toggle"
+            type="button"
+            :aria-expanded="expanded === i"
+            :aria-controls="`project-detail-${i}`"
+            @click="expanded = expanded === i ? null : i"
+          >
+            <span class="project-number">{{ String(i + 1).padStart(2, '0') }}</span>
 
-        <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-wrap gap-2" v-if="p.links?.length">
-            <a
-              v-for="link in p.links"
-              :key="link.href"
-              :href="link.href"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="border border-[#cbd9e6] px-3 py-1.5 text-xs font-bold text-[#0C447C]
-                     hover:bg-[#0C447C] hover:text-white dark:border-[#38536d] dark:text-[#78b7f5]
-                     dark:hover:bg-[#5499E0] dark:hover:text-[#0a0a0a] transition-colors"
-              @click.stop
+            <span class="project-name-block">
+              <span v-if="p.featured" class="project-kind">Independent AI project</span>
+              <strong>{{ p.name }}</strong>
+              <span class="project-period">{{ p.period }}</span>
+            </span>
+
+            <span class="project-summary">{{ p.highlight }}</span>
+
+            <span class="project-control" aria-hidden="true">
+              {{ expanded === i ? 'Close' : 'View' }} <i>↗</i>
+            </span>
+          </button>
+
+          <Transition name="project-detail">
+            <div
+              v-if="expanded === i"
+              :id="`project-detail-${i}`"
+              class="project-detail"
             >
-              {{ link.label }} ↗
-            </a>
-          </div>
-          <span class="ml-auto text-xs text-[#bbbbbb] dark:text-[#555555]">
-            {{ expanded === i ? '收起 ▴' : '展开详情 ▾' }}
-          </span>
-        </div>
-      </article>
+              <p>{{ p.detail }}</p>
+              <div class="project-meta">
+                <p class="project-tags" aria-label="技术栈">
+                  <span v-for="tag in p.tags" :key="tag">{{ tag }}</span>
+                </p>
+
+                <div v-if="p.links?.length" class="project-links">
+                  <a
+                    v-for="link in p.links"
+                    :key="link.href"
+                    :href="link.href"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {{ link.label }} <span aria-hidden="true">↗</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </article>
+      </div>
     </div>
   </section>
 </template>

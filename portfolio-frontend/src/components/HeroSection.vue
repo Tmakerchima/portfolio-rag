@@ -3,46 +3,34 @@ defineEmits<{ 'scroll-to-chat': [] }>()
 </script>
 
 <template>
-  <section class="min-h-screen flex flex-col justify-center py-20 md:py-24">
-    <div class="mb-8 flex flex-wrap gap-2" aria-label="Core skills">
-      <span class="border border-[#dbe7f2] bg-[#f4f8fc] px-3 py-1 text-xs font-bold tracking-wide text-[#0C447C]
-                   dark:border-[#26384b] dark:bg-[#101923] dark:text-[#78b7f5]">
-        JAVA / SPRING BOOT
-      </span>
-      <span class="border border-[#dbe7f2] bg-[#f4f8fc] px-3 py-1 text-xs font-bold tracking-wide text-[#0C447C]
-                   dark:border-[#26384b] dark:bg-[#101923] dark:text-[#78b7f5]">
-        AI AGENT / RAG / MCP
-      </span>
+  <section id="top" class="hero-section" aria-labelledby="hero-title">
+    <div class="hero-kicker reveal reveal-one">
+      <span>Java Backend</span>
+      <span>AI Agents</span>
+      <span>RAG Systems</span>
     </div>
 
-    <h1 class="text-[44px] md:text-[72px] font-bold leading-tight tracking-tight text-[#111111] dark:text-[#f5f5f5]">
-      马驰 <span class="text-[#0C447C] dark:text-[#5499E0]">/</span> Mac Ma
+    <h1 id="hero-title" class="hero-title reveal reveal-two">
+      I build reliable systems<br />
+      that make AI <em>useful.</em>
     </h1>
 
-    <p class="text-xl md:text-2xl text-[#666666] dark:text-[#999999] mt-4 font-normal">
-      Java Backend Engineer <span class="text-[#0C447C] dark:text-[#5499E0]">×</span> AI Agent Engineer
-    </p>
+    <div class="hero-intro reveal reveal-three">
+      <p class="hero-deck">
+        我是马驰，一名把企业级后端经验带入 AI 产品工程的开发者。
+        关注检索质量、Agent 工作流，以及模型能力如何真正进入生产系统。
+      </p>
 
-    <p class="text-lg text-[#444444] dark:text-[#bbbbbb] mt-8 max-w-[720px] leading-relaxed">
-      4 年企业级开发经验，主线是 Java / Spring Boot 后端工程，也在把 LLM 变成真正可用的产品能力。
-      做过银行核心业务系统、WMS 与 Hadoop → Databricks 数据迁移，也独立落地了基于 Spring AI 的
-      RAG、Tool Calling、MCP 与流式交互应用。
-    </p>
-
-    <div class="mt-12">
-      <button
-        @click="$emit('scroll-to-chat')"
-        class="inline-flex items-center gap-2 px-8 py-4 text-lg font-bold
-               bg-[#0C447C] dark:bg-[#5499E0] text-white
-               hover:opacity-90 transition-opacity duration-200"
-      >
-        Ask me anything
-        <span class="text-xl">→</span>
+      <button class="text-action" type="button" @click="$emit('scroll-to-chat')">
+        和我的 Portfolio Agent 聊聊
+        <span aria-hidden="true">→</span>
       </button>
     </div>
 
-    <div class="mt-24 text-[#cccccc] dark:text-[#444444] text-sm tracking-widest">
-      SCROLL
+    <div class="hero-foot reveal reveal-four" aria-label="个人简介摘要">
+      <p><span>01 / Practice</span>Java · Spring Boot · Distributed systems</p>
+      <p><span>02 / Focus</span>RAG · Agents · MCP · Retrieval</p>
+      <p><span>03 / Based</span>Shanghai, China · Open to thoughtful work</p>
     </div>
   </section>
 </template>

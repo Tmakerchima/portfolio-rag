@@ -1,17 +1,18 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{vue,ts}'],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        accent: {
-          light: '#0C447C',
-          dark: '#5499E0',
-        },
+        paper: '#F2EEE5',
+        ink: '#1F1D19',
+        muted: '#6F6A61',
+        rule: '#CEC6BA',
+        accent: '#A64B36',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['Newsreader', 'Georgia', 'serif'],
+        sans: ['DM Sans', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
       },
     },
   },
