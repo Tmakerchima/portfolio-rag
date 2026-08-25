@@ -1,8 +1,8 @@
 # EnterpriseRAG 架构
 
-EnterpriseRAG 与 Resume RAG 共用一个 Spring Boot 后端和 PostgreSQL，但使用独立的数据表与服务边界。
+EnterpriseRAG 与 Portfolio AI Agent 共用一个 Spring Boot 后端，但使用独立的数据与服务边界。
 
-Resume 语料很小，当前策略是 small corpus full context：把少量完整片段交给模型，避免为了 top-k 引入召回损失。Enterprise 语料大且持续变化，使用增量索引、数据库检索和有限上下文：
+Portfolio 知识库由少量 Markdown 文档组成，启动后进入内存 chunk store，默认使用词法 + metadata 意图检索并限制上下文；可选向量召回关闭时不会调用 query embedding。Enterprise 语料大且持续变化，使用增量索引、数据库检索和有限上下文：
 
 > RAG is not automatically better for every corpus size.
 

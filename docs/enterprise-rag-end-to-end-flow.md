@@ -20,7 +20,7 @@
 | database | Supabase PostgreSQL + pgvector |
 | source | `EnterpriseRAG-Bench/github_slice_0001.zip` |
 
-个人简历 `about-mac.md` 由 `ResumeContextProvider` 一次性读取并作为完整上下文，不查询 `vector_store`；EnterpriseRAG 使用独立的 `enterprise_documents` 和 `enterprise_chunks`。
+个人知识文档（当前为 `about-mac.md` 与 `github-trend.md`）由 `KnowledgeCorpusLoader` 启动加载、语义切块，并通过内存词法 + metadata 意图检索提供有限上下文；默认不查询或写入 `vector_store`。EnterpriseRAG 使用独立的 `enterprise_documents` 和 `enterprise_chunks`。
 
 ## 0.1 Railway redeploy、重启和重新索引不是一回事
 
@@ -41,7 +41,7 @@ flowchart TD
     M --> N[显式 activate / rollback]
 ```
 
-当前代码中，EnterpriseRAG 不会在应用启动时导入；`about-mac.md` 的 legacy `IngestService` 也只保留手动批量 helper，不会因 redeploy 自动执行。因此：
+当前代码中，EnterpriseRAG 不会在应用启动时导入；Portfolio 文档只在 JVM 内存中重新加载和切块，legacy `IngestService` 仍只保留手动批量 helper，不会因 redeploy 调用 embedding。因此：
 
 - 只 redeploy Railway：EnterpriseRAG 不重新 chunk，embedding API 调用为 0。
 - 只重启 Spring Boot：同样不会重新 chunk，Supabase 中的 ACTIVE corpus 保持不变。

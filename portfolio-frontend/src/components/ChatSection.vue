@@ -17,8 +17,9 @@ const loading = ref(false)
 const toolsUsed = ref<ToolUsage[]>([])
 
 const presets = [
-  '四年 Java 经验里最自豪的项目？',
-  '最近做了哪些 AI 项目？',
+  '马驰最近完成了哪些 GitHub 项目？',
+  'EnterpriseRAG 如何保证回答可验证？',
+  '最近 GitHub 上有哪些 Agent 趋势？',
 ]
 
 async function ask(q?: string) {

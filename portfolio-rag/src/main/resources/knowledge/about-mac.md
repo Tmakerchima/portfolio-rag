@@ -1,184 +1,155 @@
-# 马驰 — 完整个人档案
+# 马驰 — 个人与工程档案
+
+> 最后更新：2026-08-25。项目事实以马驰公开 GitHub 仓库及仓库 README 为依据；仓库数量、star、Issue、PR 和最新提交等动态数据应通过 GitHub 工具实时查询，不以本文作为实时统计来源。
 
 ## 基本信息
 
 - 姓名：马驰（英文名 Mac Ma，网络 ID：machi / tmakerchima）
-- 年龄：27岁（生日：12月23日）
-- 性别：男
+- 生日：12 月 23 日
 - 意向城市：宁波、杭州、上海
 - 联系电话：17816110155
 - 邮箱：709851837@qq.com
 - 个人博客：https://tmakerchima.github.io
-- GitHub：https://github.com/tmakerchima
-- 求职意向：Java 后端工程师 / AI Agent 工程师
+- GitHub：https://github.com/Tmakerchima
+- 求职方向：Java 后端工程师 / AI Agent 工程师
 
----
+## 核心定位
 
-## 人生理念与性格
+马驰是一名以 Java 和 Spring Boot 为工程基本盘、持续向 AI Agent 与 RAG 系统延伸的开发者。他有银行额度系统、WMS 对接、云平台接口、Databricks 数据迁移和 CI/CD 的企业经验，也独立完成了多套可以运行、测试和部署的 AI 产品。
 
-马驰的人生格言是"better tomorrow"，个人主页上写道："人嘛活得开心最重要~"。这句话体现了他积极乐观的人生态度——追求成长与进步的同时，不忘享受生活。
+他的优势不是单纯调用模型 API，而是把模型放进完整的软件链路：设计数据与权限边界，构建检索和工具调用，处理流式协议、失败降级、可观测性与评测，再把前后端部署到真实环境。公开 GitHub 项目还显示出一条清晰的演进路线：从算法与 Java 应用，走向 RAG、Agent runtime、AI 代码审查和面向真实用户的智能产品。
 
-他是一个技术热情高涨、喜欢尝鲜的人：在 GitHub Copilot 刚推出时（2022年6月）就立刻上手体验，同年10月在自己的 1660Ti GPU 上跑通了 Stable Diffusion 图像生成，同年6月还体验了阿里巴巴 RPA 自动化工具，2026年3月与 Codex AI 合作写博客。这种对新技术的敏锐嗅觉和实践精神，贯穿了他的职业成长轨迹。
+## 能力摘要
 
-马驰还有一颗文艺的心，是日本音乐大师坂本龙一（Ryuichi Sakamoto）的粉丝，在坂本龙一先生2023年辞世后，他专程在博客写下了悼文"晚安坂本龙一先生"，表达深切的怀念。
-
-他的博客已累计发布27篇文章，内容横跨技术探索、算法学习、生活随感，是一个愿意把思考分享出来的人。
-
----
+1. **企业级 Java 工程**：具备 Spring Boot、接口设计、数据库、测试、权限控制、CI/CD 和线上交付经验，参与过金融、仓储和云数据工程项目。
+2. **RAG 与 Agent 工程**：实践过语义切块、向量与词法混合召回、RRF、reranker、ACL、grounded generation、Function Calling、MCP、SSE/NDJSON 流式协议和本地工具执行。
+3. **产品落地与安全边界**：能够独立完成前后端、认证、持久化、定时任务和云部署；在 LocalAgent、Life Adventure、Spring Vibe Bench 等项目中主动设计权限、密钥、审计与风险边界。
 
 ## 教育背景
 
-**浙江工业大学 · 软件工程（本科）** 2017-09 ~ 2021-06
+**浙江工业大学 · 软件工程本科（2017-09 ～ 2021-06）**
 
-就读于浙江工业大学软件工程专业，学业表现良好，GPA 位列专业前50%。数学基础扎实，获得**全国数学竞赛二等奖**，展现出较强的理论功底。已通过英语四级，具备良好的英语读写与理解能力——这一能力在后来加入美国道富的工作中得到了充分运用。
-
-系统学习了计算机网络、软件工程、操作系统、数据结构等核心课程，积极参与创新实践，曾获校级**"创新杯"三等奖**。
-
----
+系统学习计算机网络、操作系统、数据结构和软件工程等课程。GPA 位列专业前 50%，获得全国数学竞赛二等奖、校级“创新杯”三等奖，并通过英语四级。
 
 ## 职业生涯
 
-### 第一阶段：杭州云融有限公司 — Java 后端工程师（2021-11 ~ 2023-06）
+### 杭州云融有限公司 — Java 后端工程师（2021-11 ～ 2023-06）
 
-毕业后的第一份工作，马驰加入了杭州云融有限公司，投身金融科技领域。在这里，他参与了**宁波银行额度中心项目**的核心开发，亲历了一个银行级系统从开发到上线的完整过程。这段经历让他深刻理解了企业级系统对稳定性、合规性和可维护性的要求。
+参与宁波银行额度中心和小微金融项目，经历银行级系统从开发、联调到上线的完整过程。主要积累是多渠道额度管理、ESB 接口、业务流程编排以及对稳定性、合规性和可维护性的理解。
 
-同期还参与了小微项目的开发，系统成功上线并稳定运行，积累了扎实的 Java 后端工程实践。
+### 乐歌人体工学 — WCS 开发工程师（2023-10 ～ 2024-04）
 
-### 第二阶段：乐歌人体工学 — WCS 开发工程师（2023-10 ~ 2024-04）
+参与 WMS/WCS 系统对接与自研项目开发，并把仓储业务理解转化为个人算法项目：使用 NSGA-II 与模拟退火设计仓库上架推荐方案，综合优化库存成本、需求和上架效率。
 
-马驰加入乐歌人体工学，参与 WMS 仓储管理系统的对接与开发，以及公司自研项目的研发。在这段时间，他同步开发了个人项目——**仓库上架推荐系统**，将工作中对仓储业务的理解与自主研发的 NSGA-II 遗传算法相结合，形成了一套完整的智能推荐解决方案并开源到 GitHub。
+### 美国道富 State Street — 软件开发工程师（2024-06 ～ 2026-01）
 
-### 第三阶段：美国道富（State Street）— 软件开发工程师（2024-06 ~ 2026-01）
+在英语环境中参与企业级数据和云平台工程：完成 Hadoop HDFS 到 Databricks/Delta Lake 的迁移，使用 Auto Loader 处理增量入湖与 Hive 元数据兼容问题；参与 PAM Data Repository、Azure 与 Databricks 鉴权、Harness CI/CD，以及 Azure Blob Storage Java 上传接口的开发与测试。
 
-马驰职业生涯的重要里程碑。美国道富是全球最大的托管银行之一，马驰在这里全程使用英语工作，参与了多个企业级数据工程项目：
+## 代表性 GitHub 项目
 
-- 主导 **Hadoop HDFS 至 Databricks 的数据迁移**，利用 Auto Loader 实现增量数据入湖，转换 Delta Lake 格式，解决 Hive 元数据兼容性难题
-- 参与 **PAM Data Repository** 开发，完成 Azure 与 Databricks 的鉴权配置，搭建 Harness CI/CD 体系
-- 负责 Azure Blob Storage 文件上传 Java 接口开发与测试
+### Portfolio RAG — 个人作品集 AI Agent
 
-这段经历让马驰具备了国际化大型金融机构的研发视野，也让他的技术栈从传统 Java 后端拓展到了云计算、大数据和 DevOps 领域。
+仓库：https://github.com/Tmakerchima/portfolio-rag
 
----
+这是马驰用于展示个人经历与工程能力的问答系统。前端采用 Vue 3 + TypeScript，后端采用 Java 21、Spring Boot、Spring AI 与 WebFlux；问答通过 SSE 流式返回，并可通过 Function Calling 查询博客、通过 GitHub MCP 查询动态仓库信息。
 
-## 当前职业定位
+个人知识库由 `about-mac.md` 和带日期的 `github-trend.md` 等文档组成。应用启动时按 Markdown 标题做语义切块，在线查询结合本地词法、元数据意图和可用的向量结果进行混合检索，只把命中的有限上下文交给 Qwen。这样既能让趋势文档进入真实检索，也避免每次请求重复发送整份档案。
 
-马驰的定位是 **Java 后端工程师 / AI Agent 工程师**。Java 与 Spring Boot 仍是他的工程基本盘：他有银行级系统交付、WMS 对接、云平台接口开发和大规模数据迁移经验，理解稳定性、数据一致性、接口设计、测试和 CI/CD。
+同一代码库还保留 EnterpriseRAG 演示链路，两条数据路径明确隔离。项目的关键挑战是同时处理静态知识、动态工具与流式交互；解决方式包括稳定 chunk id、有限上下文、工具调用追踪、GitHub MCP 失败降级，以及个人知识与企业语料分表分服务。
 
-在此基础上，他正在将能力延伸到 AI Agent 工程：不只调用模型 API，而是围绕真实任务设计 **RAG 检索、Tool Calling、MCP 工具接入、流式响应、提示词约束、数据持久化和可观测交互**。本作品集本身就是一套已上线的 Spring AI 应用；近期还完成了 TrendCopy AI 和 FundLens 两个面向真实使用场景的 AI 产品。
+技术栈：Java 21、Spring Boot、Spring AI、WebFlux、Hybrid Retrieval、PGVector、Function Calling、MCP、Vue 3、TypeScript、Vercel、Railway、Supabase。
 
----
+### EnterpriseRAG — 可审计的企业知识库案例
 
-## 项目经历
+仓库：https://github.com/Tmakerchima/EnterpriseRAG
 
-### 1. 额度中心项目（2021-11 ~ 2022-09，团队开发，宁波银行）
+独立版 EnterpriseRAG 把 versioned corpus、SQL 层 tenant/ACL、PGVector、PostgreSQL FTS 或 ParadeDB BM25、RRF、可选 reranker、grounded SSE、telemetry、反馈评测和 bad-case 回灌放进同一条可复现闭环。
 
-聚焦网贷模块与额度系统对接，基于 **easyflow** 构建统一网贷额度中心，通过 ESB 接口实现高效数据交换，针对微信渠道设计个性化流程。方案兼容多渠道，统一额度管理与访问控制。项目于 2022 年 9 月成功上线，运行稳定。
+这个项目重点解决的不是“能回答”而是“答案能否被验证”。每次请求携带 request id 与 trace id，前端只展示服务端真实返回的来源和指标；没有外部数据库、模型或 benchmark 时，报告会明确标记 `NOT_EXECUTED` 或 `SKIPPED_EXTERNAL_DEPENDENCY`，不会用 fixture 数据冒充真实效果。评测包将 retrieval、generation、citation、security 和 performance 指标分开，支持 baseline/candidate 比较、确定性 triage 与 regression promotion。
 
-技术栈：easyflow、ESB接口、Java、Spring Boot、多渠道兼容设计
+技术栈：Java 21、Spring Boot WebFlux、Spring AI、PostgreSQL、PGVector、ParadeDB BM25、RRF、Python evaluation package、Vue 3、Docker。
 
-### 2. Spring Boot Web 项目（2021-02 ~ 2021-06，个人）
+### Life Adventure — 个性化 Life OS
 
-基于 Spring Boot、Thymeleaf、AJAX 构建 Web 应用，采用 MySQL 8.0 及 MyBatis-Plus 实现持久化。亮点是**集成 ItemCF 推荐算法**，通过 Java 调用 Python 接口完成模型训练与数据交互，结合异步任务避免阻塞，注重数据库索引优化与安全防护。经过单元、集成及端到端测试。
+仓库：https://github.com/Tmakerchima/lifeAdvanture
+在线版本：https://life-advanture.vercel.app
 
-技术栈：Spring Boot、Thymeleaf、AJAX、MySQL 8.0、MyBatis-Plus、ItemCF推荐算法、Python
+Life Adventure 将 Stanford “Designing Your Life”的方法转化为可交互产品：用户记录人生阶段、价值观、能量与想法，Qwen 根据当前用户的真实上下文生成具体、低风险、可完成的每日行动。产品还提供人生罗盘、Odyssey 路线和未登录用户可用的公共任务。
 
-### 3. 仓库上架推荐系统（2023-10 ~ 2024-01，个人，已开源）
+项目的核心挑战是个性化与隐私同时成立。解决方式是使用 Supabase Auth 和 Google OAuth 登录，对个人数据表启用 Row Level Security，浏览器只能访问当前用户数据；Qwen 与 Service Role 密钥仅在服务端读取。每日推荐由 Vercel Cron 触发，并通过数据库唯一约束保证同一用户同一天的生成幂等。
 
-开发创新的仓库上架推荐系统，核心算法自主研发：**NSGA-II 遗传算法**和**模拟退火算法**，综合考虑库存成本、货物需求和上架效率，智能推荐最优货物摆放方案。已在 GitHub 上开源（github.com/tmakerchima），是马驰公开展示算法能力的代表作。
+技术栈：Next.js 16、React 19、TypeScript、Supabase Auth/Postgres/RLS、Qwen、Vercel Functions、Vercel Cron、GitHub Actions。
 
-技术栈：Python、NSGA-II遗传算法、模拟退火算法、多目标优化
+### Spring Vibe Bench — AI 生成 Spring 代码发布审查器
 
-### 4. 室内定位系统（2024-01 ~ 2024-04，个人）
+仓库：https://github.com/Tmakerchima/springVibebench
 
-开发高效室内定位系统，分离线采集和在线匹配两阶段。安卓端采集 Wi-Fi 信号强度、蓝牙指纹数据，在线阶段采用 **Weight KNN 算法**进行加权模式匹配，实现高精度室内位置估算，结果通过前端网页实时展示。
+Spring Vibe Bench 是一个本地、只读、确定性的 Spring Boot 发布前审查工具，用来把 AI 辅助生成代码中的高信号风险压缩为一份短小、可定位、可解释的证据报告。当前规则覆盖通配 CORS、硬编码凭据、危险 DDL、Actuator 暴露、`permitAll`、CSRF、Bean Validation、Docker 跳过测试、MyBatis 原始替换、无 WHERE 的 UPDATE/DELETE 等问题。
 
-技术栈：Spring Boot、Android、Weight KNN算法、Wi-Fi指纹、蓝牙定位
+每个 finding 都包含文件、行号、命中证据、审查理由和需要人工决定的事项；工具不会自动改写源码，也不把代码上传到 LLM 或云端。它支持 Console、JSON 和离线 HTML 报告，并可以按严重级别作为 CI release gate。项目边界明确：它不替代 SonarQube、Snyk 或人工安全审查，而是服务于更快的 Spring-aware 发布决策。
 
-### 5. Hadoop HDFS 至 Databricks 数据迁移（2024-07 ~ 2025-01，美国道富，团队）
+技术栈：Java、Maven、静态规则扫描、JSON/HTML 报告、CI release gate。
 
-参与企业级数据迁移：Hadoop HDFS → Microsoft Databricks。利用 **Auto Loader** 实现增量数据入湖，转换为 Delta Lake 格式优化查询性能，优化并行任务调度，解决 Hive 元数据兼容性问题，校验脚本保障数据一致性。
+### LocalAgent — 本地编码 Agent
 
-技术栈：Hadoop HDFS、Databricks、Delta Lake、Auto Loader、Hive、Python
+仓库：https://github.com/Tmakerchima/localAgent
+公开前端：https://local-agent-azure.vercel.app
 
-### 6. PAM 开发测试（2025-03 ~ 2026-01，美国道富，团队）
+LocalAgent 是一套在本机运行的编码 Agent，浏览器工作台与 CLI 复用同一个 Python Agent runtime，通过 Ollama + Qwen 3.5 9B 进行本地推理和工具调用。网页服务器将模型步骤、工具调用与最终回答转换为 NDJSON 流式事件，运行时不依赖 npm、PyPI 或虚拟环境。
 
-完成 Azure 与 Databricks 鉴权配置，搭建并优化 Databricks Pipeline，建立 **Harness CI/CD** 体系提高部署效率，负责 Azure Blob Storage 文件上传 Java 接口开发与测试。
+它支持 Plan、Edits、Auto 三种权限模式，提供工作区文件读取、原子写入、精确替换和受控 PowerShell 命令。安全边界包括路径越界检查、危险命令拦截、仅绑定 `127.0.0.1`、任务隔离、停止控制和工具运行记录。该项目证明马驰理解 Agent 的核心不仅是模型，而是消息循环、工具协议、权限模型、上下文与可恢复的执行状态。
 
-技术栈：Azure、Databricks、Harness CI/CD、Azure Blob Storage、Java
+技术栈：Python、Ollama、Qwen 3.5 9B、Tool Calling、Agent Loop、NDJSON、PowerShell、HTML/CSS/JavaScript。
 
-### 7. Portfolio RAG 简历 AI Agent（2026，个人，已上线并开源）
+### TrendCopy AI — 多平台内容 Agent
 
-设计并开发当前个人网站的智能问答系统。前端使用 Vue 3 + TypeScript，通过 SSE 展示流式回答；后端使用 **Java 21、Spring Boot、Spring AI 和 WebFlux** 编排多种能力：静态简历问答直接向 LLM 提供完整的 `about-mac.md` 上下文，不执行向量检索；动态信息通过 Function Calling 查询博客，并通过 GitHub 官方远程 MCP Server 查询仓库、Issue 与 PR 等实时信息。系统会在前端标记实际调用的 Function Calling 或 MCP 工具，GitHub MCP 不可用时会容错降级，避免拖垮主问答链路。
+仓库：https://github.com/Tmakerchima/trendcopyAI
+在线版本：https://trendcopy.asia
 
-同一仓库还包含独立的 EnterpriseRAG 企业知识库演示：当前生产使用 V2 generation，将 5,000 篇 EnterpriseRAG-Bench 文档切成 13,113 个 token-aware chunks（700 tokens、80-token overlap），存储在 Supabase PostgreSQL + pgvector，并通过向量检索、全文检索和 RRF 融合召回。V1 generation 已退休。个人简历问答与企业知识库使用不同的数据链路。
+TrendCopy AI 把公开的 AI/产品趋势转化为小红书、X/Twitter 和 Newsletter 内容，形成“趋势采集 → 信息整理 → LLM 生成 → 平台适配”的工作流。Spring Boot 后端接入 Qwen 与 Firecrawl，Supabase PostgreSQL 保存用户、订阅和用量，并实现邮箱验证码/密码登录、Google OAuth 和支付宝支付链路。前端由 Vercel 托管并代理 Railway 后端 API。
 
-部署链路为：前端 Vercel（https://tmakerchima.cn）、后端 Railway、企业语料数据库 Supabase PostgreSQL + pgvector。代码地址：https://github.com/Tmakerchima/portfolio-rag
+技术栈：Java、Spring Boot、Qwen、Firecrawl、Supabase PostgreSQL、Google OAuth、Resend、Alipay、Vercel、Railway。
 
-技术栈：Java 21、Spring Boot、Spring AI、WebFlux、RAG、PGVector、Function Calling、MCP、Vue 3、TypeScript、Vercel、Railway、Supabase
+### FundLens — 可解释的趋势研究助手
 
-### 8. TrendCopy AI 多平台内容 Agent（2026，个人，已上线并开源）
+仓库：https://github.com/Tmakerchima/fundPrediction
+在线版本：https://fundprediction.vercel.app
 
-将公开的 AI / 产品趋势转化为小红书、X/Twitter 和 Newsletter 的可发布内容，形成“趋势采集、信息整理、LLM 生成、多平台适配”的内容工作流。后端采用 **Java + Spring Boot**，接入 Qwen 与 Firecrawl；使用 Supabase 持久化用户、订阅和用量数据，并实现邮箱登录、Google OAuth 与支付链路。前端部署在 Vercel，后端部署在 Railway。
+FundLens 覆盖中国场外基金、A 股和美股，把多期限趋势、风险区间、费用、走步式样本外验证和信号健康度组合成研究流程。Qwen 只审查用户提供的财报、公告和新闻证据，可以降低可信度或否决，但不能提高排名、加仓或改写量化值。
 
-网站：https://trendcopy.asia；代码：https://github.com/Tmakerchima/trendcopyAI
+项目主动处理“预测容易被包装成保证”的风险：展示随机游走基准、样本外 R²、Wilson 区间、安慰剂检验和数据限制；页面将结果定位为研究候选而非买卖指令。
 
-技术栈：Java、Spring Boot、Qwen、Firecrawl、Supabase PostgreSQL、Vercel、Railway
+技术栈：JavaScript、Node.js、Qwen、量化研究、走步式回测、风险建模、Vercel、Railway。
 
-### 9. FundLens AI 趋势研究助手（2026，个人，已上线并开源）
+### 其他工程实践
 
-覆盖中国场外基金、A 股和美股的趋势研究。项目将趋势、动量、均值回归、风险区间和走步式样本外验证组合为可解释的量化研究流程，并使用 Qwen 审查用户提供的财报、公告、季报或新闻原文，输出事实、风险、催化因素以及它与量化信号是否冲突。模型输出与回测值保持只读，页面明确展示数据与方法限制，不把预测包装成收益保证。
+- **宁波银行额度中心**：Java、Spring Boot、easyflow、ESB、多渠道额度管理；2022 年 9 月上线。
+- **仓库上架推荐系统**：Python、NSGA-II、模拟退火、多目标优化，将仓储业务问题转为可计算模型。
+- **室内定位系统**：Spring Boot、Android、Wi-Fi/蓝牙指纹和加权 KNN，完成离线采集与在线定位。
+- **Hadoop → Databricks 迁移**：HDFS、Auto Loader、Delta Lake、Hive、Python，处理增量入湖和数据一致性。
 
-代码：https://github.com/Tmakerchima/fundPrediction
+## 技术栈与证据
 
-技术栈：JavaScript、Qwen、量化研究、样本外回测、风险建模、Vercel、Railway
+| 能力方向 | 主要技术 | 项目证据 |
+|---|---|---|
+| Java 后端 | Java 21、Spring Boot、WebFlux、Spring AI、JDBC | 银行额度中心、Portfolio RAG、EnterpriseRAG、TrendCopy、Spring Vibe Bench |
+| RAG 检索 | Markdown 语义切块、PGVector、FTS/BM25、RRF、reranker、ACL | Portfolio RAG、EnterpriseRAG |
+| Agent 工程 | Tool Calling、MCP、Agent Loop、权限模式、SSE/NDJSON | Portfolio RAG、LocalAgent |
+| 数据与云 | PostgreSQL、Supabase、Databricks、Delta Lake、Azure Blob | Life Adventure、TrendCopy、美国道富项目 |
+| 产品与前端 | Vue 3、TypeScript、Next.js、React、HTML/CSS/JavaScript | 个人主页、EnterpriseRAG、Life Adventure、LocalAgent |
+| 评测与安全 | retrieval/generation/citation 指标、静态规则、RLS、危险命令拦截 | EnterpriseRAG、Spring Vibe Bench、Life Adventure、LocalAgent |
+| 部署与交付 | Docker、Vercel、Railway、Harness CI/CD、GitHub Actions | 多个公开项目与美国道富工作经历 |
 
-### 10. LocalAgent 本地编码 Agent（2026，个人，已上线并开源）
+## 工程风格
 
-开发一套完全在本机运行的编码 Agent，提供类似 Codex 的浏览器三栏工作台与命令行界面。系统以 **Ollama + Qwen 3.5 9B** 完成本地推理与原生工具调用，浏览器和 CLI 复用同一个 Python Agent runtime；网页服务器将模型步骤、工具调用和最终回答转换为 NDJSON 流式事件。项目只使用 Python 标准库，不依赖 npm、PyPI 或虚拟环境。
+马驰倾向于先把边界写清楚，再扩展功能：没有真实 benchmark 就标记未执行；模型不能改写量化事实；Agent 工具受权限和路径限制；个人数据用 RLS 隔离；静态扫描只提供证据，不冒充完整安全审计。这种风格体现出他对可验证性、失败模式和真实部署约束的重视。
 
-Agent 支持 Plan、Edits、Auto 三种权限模式，能够读取与原子写入工作区文件、精确替换内容并执行受控 PowerShell 命令。文件工具限制绝对路径与 `..` 越界，默认阻止删除、磁盘操作、强制 Git 和网络下载等高风险命令；网页服务器与 Ollama 默认仅绑定 `127.0.0.1`。项目还实现了任务队列、停止控制、模型切换、上下文隔离、工具运行记录及自动化测试。
+他也习惯用项目验证新技术，而不是停留在概念层。GitHub 上的项目从 Spring/算法应用，逐步覆盖 RAG、Agent runtime、AI 代码审查、个性化产品、认证、支付、评测和部署，反映出较强的自主学习与端到端交付能力。
 
-代码：https://github.com/Tmakerchima/localAgent
+## 个人兴趣与理念
 
-技术栈：Python、Ollama、Qwen 3.5 9B、Tool Calling、Agent Loop、NDJSON Streaming、PowerShell、HTML/CSS/JavaScript、本地模型安全边界
-
----
-
-## 技术栈与能力
-
-| 技术 | 熟练度 | 备注 |
-|------|--------|------|
-| Java | 精通 | 主力语言，贯穿全部后端项目 |
-| Spring Boot | 熟练 | 多个项目实战 |
-| Hadoop | 85% | 参与大规模数据迁移 |
-| Databricks | 80% | Delta Lake、Pipeline、Auto Loader 实战 |
-| Azure | 80% | Blob Storage、鉴权配置实战 |
-| 算法 | 80% | NSGA-II遗传算法、模拟退火、KNN、ItemCF、LCS |
-| AI Agent / LLM 应用 | 熟练 | Spring AI、RAG、Function Calling、MCP、Ollama、本地 Qwen、流式交互、工具编排 |
-| Python | 一般 | 推荐算法、数据处理 |
-| MySQL / MyBatis-Plus | 熟练 | 多项目实战 |
-| PostgreSQL / PGVector | 熟练 | Supabase 托管数据库、向量检索、业务数据持久化 |
-| CI/CD (Harness) | 熟练 | 美国道富实战经验 |
-
----
-
-## 个人兴趣与技术探索
-
-马驰对新技术有着持续的好奇心，体现在他的博客实践记录中：
-
-- **2022年6月**：GitHub Copilot 刚发布就上手体验，写下使用心得
-- **2022年6月**：探索阿里巴巴 RPA 自动化工具
-- **2022年7月**：自学 Go 语言，写下学习笔记
-- **2022年10月**：在自己的 1660Ti 显卡上跑通 Stable Diffusion，体验 AI 图像生成
-- **2023年1月**：学习并记录最长公共子序列（LCS）算法
-- **2026年3月**：与 Codex AI 合作写博客，探索人机协作写作
-
-除技术外，马驰热爱音乐，是日本著名音乐家坂本龙一的粉丝，2023年坂本龙一去世时，他在博客写下深情悼念。他的生活态度体现在网站标语："人嘛活得开心最重要~"。
-
-马驰喜欢薯哥。
-
----
+马驰的人生格言是 “better tomorrow”，个人主页曾写道“人嘛活得开心最重要~”。他持续记录技术探索和生活思考，关注 AI、自动化、算法与人机协作，也喜爱坂本龙一的音乐。早期实践包括 GitHub Copilot、RPA、Go、Stable Diffusion 和算法学习。
 
 ## 职业目标
 
-马驰希望继续从事 Java 后端或 AI Agent 工程岗位。适合他的工作应当同时重视工程质量与业务落地：一方面可以发挥 Java、Spring Boot、数据工程和企业级系统经验；另一方面能够继续建设具备检索、工具调用、任务编排与可靠数据链路的 LLM 应用。
+马驰希望继续从事 Java 后端或 AI Agent 工程岗位。理想工作既重视稳定的软件工程、数据与权限边界，也允许他继续建设具有检索、工具调用、评测、可观测性和可靠执行链路的 LLM 应用。

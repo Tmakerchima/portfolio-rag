@@ -3,13 +3,13 @@
 ## 现有架构
 
 - `portfolio-rag` 是唯一 Spring Boot 后端，`/api/chat` 负责简历 Agent 的 SSE 流式问答。
-- Resume 由 `ResumeContextProvider` 读取完整 `about-mac.md`；当前不执行向量入库或在线检索。
+- Portfolio 知识由 `KnowledgeCorpusLoader` 从 `knowledge/**/*` 加载并按 Markdown 标题切块；在线默认执行内存词法 + metadata 意图检索，不在启动时写入向量库。
 - `portfolio-frontend` 是现有 Portfolio Vue 3 应用，Portfolio 与 EnterpriseRAG 共用后端但使用独立前端入口。
 
 ## 可复用组件与边界
 
 - 复用现有 DashScope `EmbeddingModel`、`ChatClient`、WebFlux/CORS 与 PostgreSQL 数据源。
-- EnterpriseRAG 放在 `com.mac.portfolio.enterprise` 下，使用独立表 `enterprise_documents` / `enterprise_chunks`；不改变 Resume 表、服务和 `/api/chat` 协议。
+- EnterpriseRAG 放在 `com.mac.portfolio.enterprise` 下，使用独立表 `enterprise_documents` / `enterprise_chunks`；不改变 Portfolio 内存知识库和 `/api/chat` SSE 协议。
 - Enterprise 检索使用 JDBC 直接执行 PostgreSQL FTS 与 pgvector 查询，确保 ACL 在数据库检索阶段生效。
 
 ## 可扩展性问题

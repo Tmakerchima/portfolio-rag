@@ -63,4 +63,27 @@ class KnowledgeDocumentChunkerTest {
         assertThat(chunks).hasSizeGreaterThan(1);
         assertThat(chunks).allMatch(document -> document.getText().length() <= 80);
     }
+
+    @Test
+    void classifiesGithubTrendSectionsForTrendRetrieval() {
+        KnowledgeDocumentChunker chunker = new KnowledgeDocumentChunker(1800);
+        String markdown = """
+                # GitHub Trend 追踪
+
+                ## GitHub 热门仓库观察
+
+                ### volcengine/OpenViking
+                Agent Context Database。
+                """;
+
+        List<Document> chunks = chunker.splitMarkdown("github-trend.md", markdown);
+
+        assertThat(chunks).singleElement().satisfies(document -> {
+            assertThat(document.getMetadata())
+                    .containsEntry("source", "github-trend.md")
+                    .containsEntry("category", "trends")
+                    .containsEntry("topic", "volcengine/OpenViking");
+            assertThat(document.getText()).contains("Agent Context Database");
+        });
+    }
 }

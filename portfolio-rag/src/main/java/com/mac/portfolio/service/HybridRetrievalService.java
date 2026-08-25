@@ -39,6 +39,7 @@ public class HybridRetrievalService {
 
     private final VectorStore vectorStore;
     private final KnowledgeChunkStore chunkStore;
+    private final boolean vectorEnabled;
     private final int vectorTopK;
     private final int finalTopK;
     private final double similarityThreshold;
@@ -52,9 +53,11 @@ public class HybridRetrievalService {
             @Value("${portfolio.rag.final-top-k:3}") int finalTopK,
             @Value("${portfolio.rag.similarity-threshold:0.35}") double similarityThreshold,
             @Value("${portfolio.rag.max-context-chars:2800}") int maxContextChars,
-            @Value("${portfolio.rag.full-context-max-chars:8000}") int fullContextMaxChars) {
+            @Value("${portfolio.rag.full-context-max-chars:8000}") int fullContextMaxChars,
+            @Value("${portfolio.rag.vector-enabled:false}") boolean vectorEnabled) {
         this.vectorStore = vectorStore;
         this.chunkStore = chunkStore;
+        this.vectorEnabled = vectorEnabled;
         this.vectorTopK = vectorTopK;
         this.finalTopK = finalTopK;
         this.similarityThreshold = similarityThreshold;
@@ -165,6 +168,7 @@ public class HybridRetrievalService {
     }
 
     private List<Document> vectorSearch(String question, String filterExpression) {
+        if (!vectorEnabled) return List.of();
         try {
             SearchRequest.Builder builder = SearchRequest.builder()
                     .query(question)
@@ -242,6 +246,11 @@ public class HybridRetrievalService {
 
         private static IntentProfile from(String question) {
             String normalized = question == null ? "" : question.toLowerCase(Locale.ROOT);
+            if (containsAny(normalized, "github trend", "github trending", "github趋势", "开源趋势", "热门仓库")
+                    || (normalized.contains("github")
+                    && containsAny(normalized, "趋势", "热门", "火爆", "值得关注"))) {
+                return new IntentProfile(Set.of("trends"), "category == 'trends'", normalized);
+            }
             if (containsAny(normalized, "项目", "作品", "做过", "开发过", "localagent", "trendcopy", "fundlens", "rag")) {
                 return new IntentProfile(Set.of("projects"), "category == 'projects'", normalized);
             }
@@ -273,7 +282,8 @@ public class HybridRetrievalService {
             String category = String.valueOf(document.getMetadata().getOrDefault("category", ""));
             String topic = String.valueOf(document.getMetadata().getOrDefault("topic", "")).toLowerCase(Locale.ROOT);
             String project = String.valueOf(document.getMetadata().getOrDefault("project", "")).toLowerCase(Locale.ROOT);
-            for (String token : List.of("localagent", "trendcopy", "fundlens", "portfolio", "databricks", "hadoop")) {
+            for (String token : List.of("localagent", "trendcopy", "fundlens", "portfolio", "databricks", "hadoop",
+                    "openviking", "ai-memory", "maka", "spring vibe bench")) {
                 if (normalizedQuestion.contains(token)) {
                     return topic.contains(token) || project.contains(token) ? 1.0 : 0.1;
                 }

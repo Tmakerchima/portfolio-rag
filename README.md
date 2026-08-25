@@ -2,7 +2,7 @@
 
 一个仓库、两条刻意分开的知识问答链路：
 
-- **简历 AI Agent**：把完整 `about-mac.md` 作为静态上下文交给 Qwen；不查询向量库。博客和 GitHub 等动态信息才使用 Function Calling / MCP。
+- **Portfolio AI Agent**：启动时加载 `knowledge/**/*`（当前包含 `about-mac.md` 与 `github-trend.md`），按 Markdown 语义切块并执行本地词法 + 元数据意图检索；可选向量召回默认关闭。博客、实时 star、Issue、PR 等动态信息使用 Function Calling / MCP。
 - **EnterpriseRAG**：对 EnterpriseRAG-Bench 文档做离线切块和向量化，当前生产索引为 V2（token-aware chunks + PGVector），使用可配置的 PostgreSQL FTS / ParadeDB BM25 + PGVector + RRF 检索，再让 Qwen 基于有限证据回答。旧 V1 generation 已退休。
 
 [EnterpriseRAG Live Site](https://enterprise-rag-frontend-seven.vercel.app/) · [个人主页](https://tmakerchima.cn/) · [GitHub](https://github.com/Tmakerchima/portfolio-rag)
@@ -34,7 +34,8 @@ flowchart LR
     U --> EF["Enterprise Vue"]
     PF -->|"POST /api/chat"| B["Spring Boot / Railway"]
     EF -->|"POST /api/enterprise/chat"| B
-    B -->|"完整 about-mac.md"| Q["Qwen"]
+    B -->|"有限检索上下文"| Q["Qwen"]
+    K["about-mac.md + github-trend.md"] -->|"语义切块"| B
     B -->|"动态问题"| T["Function Calling / GitHub MCP"]
     B -->|"PGVector + lexical backend"| P["Supabase PostgreSQL"]
     B -.->|"PARADEDB_BM25 可选"| S["ParadeDB search replica"]
@@ -50,14 +51,17 @@ sequenceDiagram
     participant U as 用户
     participant P as Portfolio 前端
     participant B as Spring Boot
-    participant C as about-mac.md
+    participant C as knowledge/*.md
+    participant R as Hybrid Retrieval
     participant L as Qwen
     participant T as 可选工具
 
     U->>P: 提问
     P->>B: POST /api/chat
-    B->>C: 读取启动时缓存的完整上下文
-    B->>L: system prompt + 完整简历 + 问题
+    B->>C: 启动时加载并语义切块
+    B->>R: 问题 + 本地 chunks
+    R-->>B: 词法/metadata 排序后的有限上下文
+    B->>L: system prompt + 检索上下文 + 问题
     opt 问题涉及实时博客或 GitHub
         L->>T: Function Calling / MCP
         T-->>L: 最新结果
@@ -65,7 +69,7 @@ sequenceDiagram
     L-->>P: 正文 SSE + @@TOOLS@@
 ```
 
-这里没有 query embedding、PGVector 检索、RAG 标签或 Sources 面板。这样可避免只有一个来源时被 top-k 切块漏掉关键履历。`about-mac.md` 当前约 6,600 字符，仍需关注每次请求重复输入完整上下文的 token 成本。
+个人知识库默认使用内存中的词法与 metadata 意图检索，不在启动时清空、重建或写入 `public.vector_store`，因此 Railway redeploy 不会产生文档 embedding 成本。`github-trend.md` 是带日期的策展快照；精确 star、最新提交、Issue 和 PR 仍由 GitHub 工具实时查询。简历 SSE 只返回正文与工具标记，不暴露内部检索片段。
 
 ### EnterpriseRAG 查询
 

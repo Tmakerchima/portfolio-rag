@@ -27,7 +27,7 @@ class HybridRetrievalServiceTest {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(fundLens, localAgent));
 
         HybridRetrievalService service = new HybridRetrievalService(
-                vectorStore, chunkStore, 10, 2, 0.35, 2800, 0);
+                vectorStore, chunkStore, 10, 2, 0.35, 2800, 0, true);
 
         List<Document> result = service.retrieve("LocalAgent 项目用了什么本地模型？");
 
@@ -49,7 +49,7 @@ class HybridRetrievalServiceTest {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenThrow(new IllegalStateException("offline"));
 
         HybridRetrievalService service = new HybridRetrievalService(
-                vectorStore, chunkStore, 10, 3, 0.35, 2800, 0);
+                vectorStore, chunkStore, 10, 3, 0.35, 2800, 0, true);
 
         List<Document> result = service.retrieve("LocalAgent 的 Ollama 模型");
 
@@ -74,7 +74,7 @@ class HybridRetrievalServiceTest {
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(skills, career));
 
         HybridRetrievalService service = new HybridRetrievalService(
-                vectorStore, chunkStore, 10, 3, 0.35, 2800, 0);
+                vectorStore, chunkStore, 10, 3, 0.35, 2800, 0, true);
 
         List<Document> result = service.retrieve("马驰毕业于哪个学校");
 
@@ -94,7 +94,7 @@ class HybridRetrievalServiceTest {
         chunkStore.replace(List.of(first, second));
 
         HybridRetrievalService service = new HybridRetrievalService(
-                vectorStore, chunkStore, 10, 3, 0.35, 2800, 8000);
+                vectorStore, chunkStore, 10, 3, 0.35, 2800, 8000, true);
 
         List<Document> result = service.retrieve("马驰毕业于哪个学校");
 
@@ -114,11 +114,59 @@ class HybridRetrievalServiceTest {
         chunkStore.replace(List.of(doc));
 
         HybridRetrievalService service = new HybridRetrievalService(
-                vectorStore, chunkStore, 10, 3, 0.35, 2800, 8000);
+                vectorStore, chunkStore, 10, 3, 0.35, 2800, 8000, true);
 
         List<Document> result = service.retrieve("随便问一句");
         // 语料超过 full-context-max-chars，不应走全量；向量检索被 mock 返回空 → 最终无候选
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void githubTrendQuestionPrefersDatedTrendKnowledge() {
+        VectorStore vectorStore = mock(VectorStore.class);
+        KnowledgeChunkStore chunkStore = new KnowledgeChunkStore();
+        Document profile = document("profile", "马驰的 GitHub 与 Java 项目", "基本信息", 0.82,
+                Map.of("category", "basic", "section", "基本信息", "topic", "基本信息"));
+        Document trend = document("trend", "GitHub 热门 Agent 趋势包括 OpenViking 上下文数据库与 Maka 审计运行时",
+                "GitHub 热门仓库观察", null,
+                Map.of("source", "github-trend.md", "category", "trends",
+                        "section", "GitHub 热门仓库观察", "topic", "GitHub 热门仓库观察"));
+        chunkStore.replace(List.of(profile, trend));
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(profile));
+
+        HybridRetrievalService service = new HybridRetrievalService(
+                vectorStore, chunkStore, 10, 3, 0.35, 2800, 0, false);
+
+        List<Document> result = service.retrieve("最近 GitHub 上有哪些 Agent 趋势值得关注？");
+
+        assertThat(result).isNotEmpty();
+        assertThat(result.get(0).getMetadata())
+                .containsEntry("source", "github-trend.md")
+                .containsEntry("category", "trends");
+        assertThat(result.get(0).getText()).contains("OpenViking", "Maka");
+    }
+
+    @Test
+    void personalGithubProjectQuestionDoesNotGetMisroutedToTrendSnapshot() {
+        VectorStore vectorStore = mock(VectorStore.class);
+        KnowledgeChunkStore chunkStore = new KnowledgeChunkStore();
+        Document project = document("project", "马驰最近完成 Life Adventure 和 EnterpriseRAG 项目",
+                "代表性 GitHub 项目", null,
+                Map.of("category", "projects", "section", "代表性 GitHub 项目", "topic", "代表性 GitHub 项目"));
+        Document trend = document("trend", "GitHub 热门 Agent 趋势包括 OpenViking",
+                "GitHub 热门仓库观察", null,
+                Map.of("source", "github-trend.md", "category", "trends",
+                        "section", "GitHub 热门仓库观察", "topic", "GitHub 热门仓库观察"));
+        chunkStore.replace(List.of(project, trend));
+
+        HybridRetrievalService service = new HybridRetrievalService(
+                vectorStore, chunkStore, 10, 3, 0.35, 2800, 0, false);
+
+        List<Document> result = service.retrieve("马驰最近完成了哪些 GitHub 项目？");
+
+        assertThat(result).isNotEmpty();
+        assertThat(result.get(0).getMetadata()).containsEntry("category", "projects");
+        assertThat(result.get(0).getText()).contains("Life Adventure", "EnterpriseRAG");
     }
 
     private Document document(String id, String text, String topic, Double score, Map<String, Object> extraMetadata) {

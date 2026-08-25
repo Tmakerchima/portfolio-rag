@@ -10,12 +10,11 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Legacy Resume vector-store helper.
+ * Legacy/manual Portfolio vector-store helper.
  *
- * Resume retrieval no longer runs at application startup.  The old implementation
- * deleted vector_store on every boot, which made the table look like a source of
- * truth while it was actually only a disposable projection of about-mac.md.
- * Keep the batch helper for legacy/manual tests, but never invoke it from startup.
+ * The active Portfolio path loads knowledge documents into an in-memory chunk store
+ * and never deletes or rebuilds vector_store on application startup. Keep this batch
+ * helper for controlled embedding jobs and tests only.
  */
 @Service
 public class IngestService {

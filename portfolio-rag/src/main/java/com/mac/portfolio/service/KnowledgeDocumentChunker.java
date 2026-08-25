@@ -161,6 +161,7 @@ public class KnowledgeDocumentChunker {
     }
 
     private String categoryOf(String section) {
+        if (section.contains("趋势") || section.contains("热门仓库") || section.contains("Trend")) return "trends";
         if (section.contains("基本信息")) return "basic";
         if (section.contains("教育")) return "education";
         if (section.contains("职业生涯") || section.contains("工作经历")) return "career";

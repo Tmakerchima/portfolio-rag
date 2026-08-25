@@ -42,19 +42,20 @@ spring:
 
 # 自定义配置：简历知识库路径
 portfolio:
-  knowledge-path: classpath:knowledge/**/*
+  knowledge-path: classpath*:knowledge/**/*
   rag:
-    # 入库时按 Markdown 标题语义切块；在线先扩大向量召回，再做 metadata + lexical 本地重排。
+    # 启动时加载 knowledge/**/* 并按 Markdown 标题语义切块；在线结合可用向量结果、metadata 与本地词法重排。
+    # 这条个人知识链路只加载到内存，不会在 redeploy 时清空或重建 public.vector_store。
+    vector-enabled: false
     max-chunk-chars: 1800
-    vector-top-k: 10
-    final-top-k: 3
+    vector-top-k: 12
+    final-top-k: 4
     # 短问题（如"毕业于哪个学校"）向量相似度往往偏低且扎堆，0.35 会把真正相关的片段过滤掉，
     # 导致"问教育却召回技术栈"。降到 0.25 后召回更充分，排序交给意图加权 + 词法重排。
     similarity-threshold: 0.25
-    max-context-chars: 2800
-    # 小语料全量上下文：整个知识库字符数不超过该值时，不检索而是把全部片段喂给 LLM。
-    # 当前简历约 6600 字符，因此线上走全量；知识库扩大后自动回退到混合检索。设 0 可关闭。
-    full-context-max-chars: 8000
+    max-context-chars: 4800
+    # 设为 0，确保 about-mac.md 与 github-trend.md 都经过检索，不把整库重复发送给模型。
+    full-context-max-chars: 0
 
 # EnterpriseRAG uses separate enterprise_* tables and is never ingested at startup.
 # Apply the additive migration in db/migration manually before enabling production ingestion.
