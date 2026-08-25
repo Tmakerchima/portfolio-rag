@@ -8,7 +8,6 @@ interface ToolUsage {
   name: string
 }
 
-// Ignore source frames from an older backend during a rolling deployment.
 const LEGACY_SOURCES_MARKER = '@@SOURCES@@'
 const TOOLS_MARKER = '@@TOOLS@@'
 
@@ -19,7 +18,6 @@ const toolsUsed = ref<ToolUsage[]>([])
 
 const presets = [
   '四年 Java 经验里最自豪的项目？',
-  '这个 AI Agent 作品集是怎么实现的？',
   '最近做了哪些 AI 项目？',
 ]
 
@@ -51,20 +49,16 @@ async function ask(q?: string) {
         .filter((line) => line.startsWith('data:'))
         .map((line) => line.slice(5).replace(/^ /, ''))
         .join('\n')
-      if (!content) return
-
-      if (content.startsWith(LEGACY_SOURCES_MARKER)) {
-        return
-      }
+      if (!content || content.startsWith(LEGACY_SOURCES_MARKER)) return
 
       if (content.startsWith(TOOLS_MARKER)) {
         try {
           const raw: string[] = JSON.parse(content.slice(TOOLS_MARKER.length))
-          toolsUsed.value = raw.map((s) => {
-            const idx = s.indexOf(':')
-            return idx >= 0
-              ? { origin: s.slice(0, idx), name: s.slice(idx + 1) }
-              : { origin: s, name: '' }
+          toolsUsed.value = raw.map((item) => {
+            const separator = item.indexOf(':')
+            return separator >= 0
+              ? { origin: item.slice(0, separator), name: item.slice(separator + 1) }
+              : { origin: item, name: '' }
           })
         } catch {
           toolsUsed.value = []
@@ -82,14 +76,13 @@ async function ask(q?: string) {
       sseBuffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
       const events = sseBuffer.split('\n\n')
       sseBuffer = events.pop() ?? ''
-      for (const event of events) {
-        handleSseEvent(event)
-      }
+      for (const event of events) handleSseEvent(event)
     }
+
     sseBuffer += decoder.decode().replace(/\r\n/g, '\n')
     if (sseBuffer.trim()) handleSseEvent(sseBuffer)
-  } catch (e) {
-    answer.value = '请求出错，请确认后端服务正在运行。'
+  } catch {
+    answer.value = '暂时无法连接，请稍后再试。'
   } finally {
     loading.value = false
   }
@@ -97,61 +90,42 @@ async function ask(q?: string) {
 </script>
 
 <template>
-  <section id="chat" class="editorial-section chat-section" aria-labelledby="chat-title">
-    <div class="section-aside">
-      <p class="section-index">02</p>
-      <p class="section-label">Portfolio agent</p>
+  <section id="chat" class="content-section chat-section" aria-labelledby="chat-title">
+    <div class="section-header chat-heading">
+      <p class="eyebrow">Portfolio AI</p>
+      <h2 id="chat-title">Ask me anything.</h2>
+      <p>想快速了解我的经历或项目？直接问就好。</p>
     </div>
 
-    <div class="section-body chat-layout">
-      <div class="chat-intro">
-        <p class="chat-note">An alternate way to browse this portfolio</p>
-        <h2 id="chat-title" class="section-title">Ask about<br /><em>my work.</em></h2>
-        <p class="section-intro">
-          使用完整简历上下文，可调用 Function Calling 与 GitHub MCP。回答会以流式方式自然出现。
-        </p>
+    <div class="chat-workspace" :aria-busy="loading">
+      <div class="prompt-list" aria-label="推荐问题">
+        <button v-for="preset in presets" :key="preset" type="button" @click="ask(preset)">
+          {{ preset }}
+        </button>
       </div>
 
-      <div class="chat-workspace" :aria-busy="loading">
-        <p class="prompt-label">Start with a question</p>
-        <div class="prompt-list">
-          <button v-for="p in presets" :key="p" type="button" @click="ask(p)">
-            <span>{{ p }}</span>
-            <span aria-hidden="true">→</span>
-          </button>
-        </div>
+      <form class="question-form" @submit.prevent="ask()">
+        <label class="sr-only" for="portfolio-question">输入想了解的问题</label>
+        <input
+          id="portfolio-question"
+          v-model="question"
+          type="text"
+          placeholder="输入一个问题…"
+          autocomplete="off"
+          :disabled="loading"
+        />
+        <button type="submit" :disabled="loading" :aria-label="loading ? '正在思考' : '发送问题'">
+          {{ loading ? '…' : '→' }}
+        </button>
+      </form>
 
-        <form class="question-form" @submit.prevent="ask()">
-          <label class="sr-only" for="portfolio-question">输入想了解的问题</label>
-          <input
-            id="portfolio-question"
-            v-model="question"
-            type="text"
-            placeholder="输入你的问题…"
-            autocomplete="off"
-            :disabled="loading"
-          />
-          <button type="submit" :disabled="loading">
-            {{ loading ? 'Thinking' : 'Ask' }}
-            <span aria-hidden="true">{{ loading ? '…' : '↗' }}</span>
-          </button>
-        </form>
+      <div v-if="answer" class="chat-answer" aria-live="polite">
+        <div class="answer-copy">{{ answer }}</div>
 
-        <div v-if="loading" class="chat-loading" role="status" aria-label="正在生成回答">
-          <span />
-          <span />
-          <span />
-        </div>
-
-        <div v-if="answer" class="chat-answer" aria-live="polite">
-          <p class="answer-label">Response</p>
-          <div class="answer-copy">{{ answer }}</div>
-
-          <div v-if="toolsUsed.length" class="tools-used" aria-label="本轮使用的工具">
-            <span v-for="(t, i) in toolsUsed" :key="i">
-              {{ t.origin === 'mcp' ? 'MCP' : 'Function' }}{{ t.name ? ' / ' + t.name : '' }}
-            </span>
-          </div>
+        <div v-if="toolsUsed.length" class="tools-used" aria-label="本轮使用的工具">
+          <span v-for="(tool, index) in toolsUsed" :key="index">
+            {{ tool.origin === 'mcp' ? 'MCP' : 'Function' }}{{ tool.name ? ' / ' + tool.name : '' }}
+          </span>
         </div>
       </div>
     </div>

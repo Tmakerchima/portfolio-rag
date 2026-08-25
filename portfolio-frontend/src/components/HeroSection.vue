@@ -4,33 +4,21 @@ defineEmits<{ 'scroll-to-chat': [] }>()
 
 <template>
   <section id="top" class="hero-section" aria-labelledby="hero-title">
-    <div class="hero-kicker reveal reveal-one">
-      <span>Java Backend</span>
-      <span>AI Agents</span>
-      <span>RAG Systems</span>
-    </div>
+    <p class="eyebrow reveal">Java + AI Engineer</p>
 
     <h1 id="hero-title" class="hero-title reveal reveal-two">
-      I build reliable systems<br />
-      that make AI <em>useful.</em>
+      I build useful<br />AI systems.
     </h1>
 
-    <div class="hero-intro reveal reveal-three">
-      <p class="hero-deck">
-        我是马驰，一名把企业级后端经验带入 AI 产品工程的开发者。
-        关注检索质量、Agent 工作流，以及模型能力如何真正进入生产系统。
-      </p>
+    <p class="hero-deck reveal reveal-three">
+      我是马驰。用 Java、RAG 与 Agent，把 AI 做成可靠、可上线的产品。
+    </p>
 
-      <button class="text-action" type="button" @click="$emit('scroll-to-chat')">
-        和我的 Portfolio Agent 聊聊
-        <span aria-hidden="true">→</span>
+    <div class="hero-actions reveal reveal-four">
+      <a class="primary-action" href="#projects">查看项目</a>
+      <button class="secondary-action" type="button" @click="$emit('scroll-to-chat')">
+        问问我的 AI <span aria-hidden="true">→</span>
       </button>
-    </div>
-
-    <div class="hero-foot reveal reveal-four" aria-label="个人简介摘要">
-      <p><span>01 / Practice</span>Java · Spring Boot · Distributed systems</p>
-      <p><span>02 / Focus</span>RAG · Agents · MCP · Retrieval</p>
-      <p><span>03 / Based</span>Shanghai, China · Open to thoughtful work</p>
     </div>
   </section>
 </template>
