@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 public class KnowledgeDocumentChunker {
 
     private static final Pattern HEADING = Pattern.compile("^(#{1,3})\\s+(.+?)\\s*$");
+    private static final Pattern FRONT_MATTER = Pattern.compile("\\A---\\R(.*?)\\R---(?:\\R|\\z)", Pattern.DOTALL);
     private final int maxChunkChars;
 
     public KnowledgeDocumentChunker(
@@ -52,6 +53,8 @@ public class KnowledgeDocumentChunker {
     }
 
     List<Document> splitMarkdown(String source, String markdown) {
+        ParsedMarkdown parsed = parseFrontMatter(markdown);
+        markdown = parsed.body();
         List<Section> sections = new ArrayList<>();
         String title = source;
         String section = "概览";
@@ -88,9 +91,18 @@ public class KnowledgeDocumentChunker {
         for (Section item : sections) {
             List<String> pieces = splitLongText(item.text());
             for (int part = 0; part < pieces.size(); part++) {
-                String category = categoryOf(item.section());
+                String category = "github_trend".equals(parsed.metadata().get("document_type"))
+                        ? "trends"
+                        : categoryOf(item.section());
                 String topic = item.subsection().isBlank() ? item.section() : item.subsection();
-                Map<String, Object> metadata = new HashMap<>();
+                Map<String, Object> metadata = new HashMap<>(parsed.metadata());
+                if ("github_trend".equals(metadata.get("document_type"))
+                        && !item.section().contains("自动快照")) {
+                    Object analysisDate = metadata.get("analysis_date");
+                    Object analysisExpiresAt = metadata.get("analysis_expires_at");
+                    if (analysisDate != null) metadata.put("snapshot_date", analysisDate);
+                    if (analysisExpiresAt != null) metadata.put("expires_at", analysisExpiresAt);
+                }
                 metadata.put("source", source);
                 metadata.put("title", title);
                 metadata.put("section", item.section());
@@ -106,6 +118,21 @@ public class KnowledgeDocumentChunker {
             }
         }
         return chunks;
+    }
+
+    private ParsedMarkdown parseFrontMatter(String markdown) {
+        Matcher matcher = FRONT_MATTER.matcher(markdown == null ? "" : markdown);
+        if (!matcher.find()) return new ParsedMarkdown(Map.of(), markdown == null ? "" : markdown);
+
+        Map<String, Object> metadata = new HashMap<>();
+        for (String line : matcher.group(1).split("\\R")) {
+            int separator = line.indexOf(':');
+            if (separator <= 0) continue;
+            String key = line.substring(0, separator).trim();
+            String value = line.substring(separator + 1).trim();
+            if (!key.isBlank() && !value.isBlank()) metadata.put(key, value);
+        }
+        return new ParsedMarkdown(Map.copyOf(metadata), markdown.substring(matcher.end()));
     }
 
     private Document buildDocument(String source, int index, String text, Map<String, Object> metadata) {
@@ -175,4 +202,5 @@ public class KnowledgeDocumentChunker {
     }
 
     private record Section(String section, String subsection, String text) {}
+    private record ParsedMarkdown(Map<String, Object> metadata, String body) {}
 }

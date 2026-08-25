@@ -169,6 +169,38 @@ class HybridRetrievalServiceTest {
         assertThat(result.get(0).getText()).contains("Life Adventure", "EnterpriseRAG");
     }
 
+    @Test
+    void bm25RewardsRareTermsInsteadOfSimpleTokenOverlap() {
+        VectorStore vectorStore = mock(VectorStore.class);
+        KnowledgeChunkStore chunkStore = new KnowledgeChunkStore();
+        Document rare = document("rare", "Spring LocalAgent 本地执行", "LocalAgent", null);
+        Document commonOne = document("common-1", "Spring 后端服务", "服务一", null);
+        Document commonTwo = document("common-2", "Spring 数据接口", "服务二", null);
+        List<Document> documents = List.of(rare, commonOne, commonTwo);
+        HybridRetrievalService service = new HybridRetrievalService(
+                vectorStore, chunkStore, 10, 3, 0.35, 2800, 0, false);
+
+        Map<String, Double> scores = service.bm25Scores("Spring LocalAgent", documents);
+
+        assertThat(scores.get("rare")).isGreaterThan(scores.get("common-1"));
+    }
+
+    @Test
+    void comprehensiveProjectQuestionExpandsTopKBudget() {
+        VectorStore vectorStore = mock(VectorStore.class);
+        KnowledgeChunkStore chunkStore = new KnowledgeChunkStore();
+        List<Document> projects = java.util.stream.IntStream.range(0, 9)
+                .mapToObj(index -> document("project-" + index, "项目 " + index, "项目 " + index, null))
+                .toList();
+        chunkStore.replace(projects);
+        HybridRetrievalService service = new HybridRetrievalService(
+                vectorStore, chunkStore, 10, 4, 0.35, 2800, 0, false);
+
+        List<Document> result = service.retrieve("完整列出全部项目");
+
+        assertThat(result).hasSize(8);
+    }
+
     private Document document(String id, String text, String topic, Double score, Map<String, Object> extraMetadata) {
         Map<String, Object> metadata = new java.util.HashMap<>(Map.of(
                 "source", "about-mac.md",

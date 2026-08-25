@@ -382,6 +382,38 @@ input:focus-visible {
   white-space: pre-wrap;
 }
 
+.answer-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  color: #8c877f;
+  font-size: 9px;
+}
+
+.source-label {
+  margin-right: 2px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.source-item {
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.source-item small {
+  margin-left: 5px;
+  color: #78906a;
+  font-size: inherit;
+}
+
+.source-item small.stale {
+  color: var(--accent);
+}
+
 .tools-used {
   display: flex;
   flex-wrap: wrap;

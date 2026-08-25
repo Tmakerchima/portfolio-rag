@@ -1,0 +1,46 @@
+name: Portfolio Quality
+
+on:
+  push:
+    paths:
+      - "portfolio-rag/**"
+      - "portfolio-frontend/**"
+      - "scripts/**"
+      - ".github/workflows/portfolio-quality.yml"
+  pull_request:
+    paths:
+      - "portfolio-rag/**"
+      - "portfolio-frontend/**"
+      - "scripts/**"
+      - ".github/workflows/portfolio-quality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  retrieval-and-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: portfolio-rag/pom.xml
+      - name: Run backend and retrieval evaluation tests
+        working-directory: portfolio-rag
+        run: mvn -B clean test
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: portfolio-frontend/package-lock.json
+      - name: Build the minimal frontend
+        working-directory: portfolio-frontend
+        run: npm ci && npm run build
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Test GitHub trend refresh parser
+        run: python -m unittest discover -s scripts/tests

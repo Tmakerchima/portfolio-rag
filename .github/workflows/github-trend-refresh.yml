@@ -1,0 +1,49 @@
+name: Refresh GitHub Trend
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+      timezone: "Asia/Taipei"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Refresh weekly, monthly, and high-star snapshot
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/update_github_trends.py
+      - name: Test the refresh parser
+        run: python -m unittest discover -s scripts/tests
+      - name: Open or update the review pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then
+            echo "The snapshot is already current."
+            exit 0
+          fi
+          branch="automation/github-trend-weekly"
+          base="${{ github.event.repository.default_branch }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$branch"
+          git add portfolio-rag/src/main/resources/knowledge/github-trend.md
+          git commit -m "docs: refresh latest GitHub trend snapshot"
+          git push --force-with-lease origin "$branch"
+          if [ "$(gh pr list --head "$branch" --base "$base" --state open --json number --jq length)" = "0" ]; then
+            gh pr create --base "$base" --head "$branch" \
+              --title "docs: refresh latest GitHub trend snapshot" \
+              --body "Automated weekly run combining GitHub Trending weekly/monthly data and high-star Agent repositories. Please review relevance and refresh dated human analysis when needed."
+          fi

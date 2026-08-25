@@ -2,7 +2,7 @@
 
 一个仓库、两条刻意分开的知识问答链路：
 
-- **Portfolio AI Agent**：启动时加载 `knowledge/**/*`（当前包含 `about-mac.md` 与 `github-trend.md`），按 Markdown 语义切块并执行本地词法 + 元数据意图检索；可选向量召回默认关闭。博客、实时 star、Issue、PR 等动态信息使用 Function Calling / MCP。
+- **Portfolio AI Agent**：启动时加载 `knowledge/**/*`（当前包含 `about-mac.md` 与 `github-trend.md`），按 Markdown 语义切块并执行内存 BM25 + 元数据意图检索；可选向量召回默认关闭。博客、实时 star、Issue、PR 等动态信息使用 Function Calling / MCP。
 - **EnterpriseRAG**：对 EnterpriseRAG-Bench 文档做离线切块和向量化，当前生产索引为 V2（token-aware chunks + PGVector），使用可配置的 PostgreSQL FTS / ParadeDB BM25 + PGVector + RRF 检索，再让 Qwen 基于有限证据回答。旧 V1 generation 已退休。
 
 [EnterpriseRAG Live Site](https://enterprise-rag-frontend-seven.vercel.app/) · [个人主页](https://tmakerchima.cn/) · [GitHub](https://github.com/Tmakerchima/portfolio-rag)
@@ -60,16 +60,18 @@ sequenceDiagram
     P->>B: POST /api/chat
     B->>C: 启动时加载并语义切块
     B->>R: 问题 + 本地 chunks
-    R-->>B: 词法/metadata 排序后的有限上下文
+    R-->>B: BM25/metadata 排序后的有限上下文
     B->>L: system prompt + 检索上下文 + 问题
     opt 问题涉及实时博客或 GitHub
         L->>T: Function Calling / MCP
         T-->>L: 最新结果
     end
-    L-->>P: 正文 SSE + @@TOOLS@@
+    L-->>P: 正文 SSE + @@SOURCES@@ + @@TOOLS@@
 ```
 
-个人知识库默认使用内存中的词法与 metadata 意图检索，不在启动时清空、重建或写入 `public.vector_store`，因此 Railway redeploy 不会产生文档 embedding 成本。`github-trend.md` 是带日期的策展快照；精确 star、最新提交、Issue 和 PR 仍由 GitHub 工具实时查询。简历 SSE 只返回正文与工具标记，不暴露内部检索片段。
+个人知识库默认使用内存 BM25 与 metadata 意图检索，不在启动时清空、重建或写入 `public.vector_store`，因此 Railway redeploy 不会产生文档 embedding 成本。`github-trend.md` 使用结构化快照日期与有效期；过期片段不会被表述为当前事实，精确 star、最新提交、Issue 和 PR 仍由 GitHub 工具实时查询。简历 SSE 返回正文、文档级来源/快照状态和工具标记，不暴露内部 chunk 内容。
+
+推荐问题来自后端的 `portfolio-recommendations.json`；`scripts/update_github_trends.py` 每周合并最近一周、最近一月与高 Star Agent 仓库，并由 GitHub Actions 创建待审核 PR。26 条固定检索问题作为 CI 回归门禁，覆盖个人信息、教育、经历、项目、技术栈和趋势意图。
 
 ### EnterpriseRAG 查询
 
@@ -167,6 +169,7 @@ docs/                     架构、部署、容量、灾备与完整流程
 DASHSCOPE_API_KEY=<server-side secret>
 SUPABASE_DB_PASSWORD=<server-side secret>
 GITHUB_MCP_PAT=<optional server-side secret>
+PORTFOLIO_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-frontend.example
 ENTERPRISE_RAG_ADMIN_TOKEN=<server-side secret>
 ENTERPRISE_RAG_ACTIVE_CORPUS_ID=<validated corpus uuid>
 ```
@@ -198,7 +201,7 @@ Vercel 的个人主页使用 `VITE_API_BASE`，Enterprise 前端使用 `VITE_API
 5. **控制 prompt/context**：限制 Enterprise top-k 和最大上下文；`about-mac.md` 继续增长时，生成可审计的紧凑静态上下文，避免每问重复发送无关内容。
 6. **避免无效 reranker 成本**：只有离线评估证明收益后才接付费 reranker；否则保留 RRF。
 7. **数据库容量治理**：监控表、WAL、GIN/HNSW 和旧 generations；先保留可回滚版本，再按保留策略清理。量化或 `halfvec` 必须经过召回率与兼容性测试。
-8. **生产防护**：收紧 CORS、增加限流/配额、管理接口鉴权、日志脱敏，以及问题级 tracing 和离线回归评估。
+8. **生产防护**：显式 CORS 域名清单已经启用；后续增加限流/配额、管理接口鉴权、日志脱敏和问题级 tracing。
 
 更完整的运行、降级、回滚和验收说明见 [`docs/enterprise-rag-end-to-end-flow.md`](docs/enterprise-rag-end-to-end-flow.md)；ParadeDB Contextual BM25 的配置、复制与 smoke test 见 [`docs/enterprise-contextual-bm25.md`](docs/enterprise-contextual-bm25.md)。
 

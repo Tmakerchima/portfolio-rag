@@ -6,10 +6,11 @@ Java 21 + Spring Boot 3.3 + Spring AI 后端，同时提供个人简历 Agent �
 
 | API | 数据策略 | 每次请求的 DashScope 调用 |
 |---|---|---:|
-| `POST /api/chat` | 启动加载 `knowledge/**/*`；Markdown 切块 + 本地词法/metadata 检索，可选向量召回默认关闭 | 通常 1 次 Qwen；工具问题可能 2+ 模型回合 |
+| `POST /api/chat` | 启动加载 `knowledge/**/*`；Markdown 切块 + 内存 BM25/metadata 检索，可选向量召回默认关闭 | 通常 1 次 Qwen；工具问题可能 2+ 模型回合 |
+| `GET /api/chat/recommendations` | 从服务端 JSON 读取 2～5 个推荐问题 | 0 |
 | `POST /api/enterprise/chat` | `enterprise_*` 表；可配置 PostgreSQL FTS 或 ParadeDB BM25 + PGVector + RRF | 1 次 query embedding + 1 次 Qwen |
 
-简历 SSE 只包含正文和末尾的 `@@TOOLS@@<json>`。Enterprise SSE 使用独立的 `@@SOURCES@@`、`@@METRICS@@` 和 `@@ERROR@@` 帧。
+简历 SSE 包含正文、`@@SOURCES@@<json>` 和末尾的 `@@TOOLS@@<json>`；来源只提供文档、章节和快照状态，不暴露内部 chunk。Enterprise SSE 使用独立的 `@@SOURCES@@`、`@@METRICS@@` 和 `@@ERROR@@` 帧。
 
 `KnowledgeCorpusLoader` 会在启动时把 `about-mac.md`、`github-trend.md` 等文档加载到内存检索库，但不会写入、清空或重建 `vector_store`。`IngestService` 仍是受控 embedding 任务的手动 helper。Enterprise 导入同样不是启动任务，由 `eval/enterprise_rag_worker.py` 在受控 runner 中执行。
 
@@ -21,6 +22,7 @@ Java 21 + Spring Boot 3.3 + Spring AI 后端，同时提供个人简历 Agent �
 DASHSCOPE_API_KEY=<secret>
 SUPABASE_DB_PASSWORD=<secret>
 GITHUB_MCP_PAT=<optional secret>
+PORTFOLIO_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-frontend.example
 ENTERPRISE_RAG_ADMIN_TOKEN=<secret>
 ENTERPRISE_RAG_ACTIVE_CORPUS_ID=<validated corpus uuid>
 ENTERPRISE_RAG_MAX_CHUNK_TOKENS=700

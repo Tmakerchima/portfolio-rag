@@ -7,7 +7,6 @@
 - 姓名：马驰（英文名 Mac Ma，网络 ID：machi / tmakerchima）
 - 生日：12 月 23 日
 - 意向城市：宁波、杭州、上海
-- 联系电话：17816110155
 - 邮箱：709851837@qq.com
 - 个人博客：https://tmakerchima.github.io
 - GitHub：https://github.com/Tmakerchima
@@ -47,13 +46,17 @@
 
 ## 代表性 GitHub 项目
 
+### GitHub 项目总览
+
+公开代表项目包括 Portfolio RAG、EnterpriseRAG、Life Adventure、Spring Vibe Bench、LocalAgent、TrendCopy AI 与 FundLens；此外还有宁波银行额度中心、仓库上架推荐、室内定位和 Hadoop → Databricks 迁移等企业或算法实践。需要完整介绍时，应先用这份总览保证覆盖，再按用户关注点展开具体项目。
+
 ### Portfolio RAG — 个人作品集 AI Agent
 
 仓库：https://github.com/Tmakerchima/portfolio-rag
 
 这是马驰用于展示个人经历与工程能力的问答系统。前端采用 Vue 3 + TypeScript，后端采用 Java 21、Spring Boot、Spring AI 与 WebFlux；问答通过 SSE 流式返回，并可通过 Function Calling 查询博客、通过 GitHub MCP 查询动态仓库信息。
 
-个人知识库由 `about-mac.md` 和带日期的 `github-trend.md` 等文档组成。应用启动时按 Markdown 标题做语义切块，在线查询结合本地词法、元数据意图和可用的向量结果进行混合检索，只把命中的有限上下文交给 Qwen。这样既能让趋势文档进入真实检索，也避免每次请求重复发送整份档案。
+个人知识库由 `about-mac.md` 和带日期、有效期的 `github-trend.md` 等文档组成。应用启动时按 Markdown 标题做语义切块，在线查询结合内存 BM25、元数据意图和可用的向量结果进行混合检索，只把命中的有限上下文交给 Qwen，并向前端返回文档级来源与快照状态。这样既能让趋势文档进入真实检索，也避免每次请求重复发送整份档案。
 
 同一代码库还保留 EnterpriseRAG 演示链路，两条数据路径明确隔离。项目的关键挑战是同时处理静态知识、动态工具与流式交互；解决方式包括稳定 chunk id、有限上下文、工具调用追踪、GitHub MCP 失败降级，以及个人知识与企业语料分表分服务。
 

@@ -86,4 +86,35 @@ class KnowledgeDocumentChunkerTest {
             assertThat(document.getText()).contains("Agent Context Database");
         });
     }
+
+    @Test
+    void propagatesFrontMatterAndUsesIndependentAnalysisFreshness() {
+        KnowledgeDocumentChunker chunker = new KnowledgeDocumentChunker(1800);
+        String markdown = """
+                ---
+                document_type: github_trend
+                snapshot_date: 2026-08-25
+                expires_at: 2026-09-08
+                analysis_date: 2026-08-01
+                analysis_expires_at: 2026-08-15
+                ---
+                # GitHub Trend
+
+                ## 本周自动快照
+                snapshot
+
+                ## GitHub 趋势信号
+                analysis
+                """;
+
+        List<Document> chunks = chunker.splitMarkdown("github-trend.md", markdown);
+
+        assertThat(chunks).hasSize(2);
+        assertThat(chunks.get(0).getMetadata())
+                .containsEntry("snapshot_date", "2026-08-25")
+                .containsEntry("expires_at", "2026-09-08");
+        assertThat(chunks.get(1).getMetadata())
+                .containsEntry("snapshot_date", "2026-08-01")
+                .containsEntry("expires_at", "2026-08-15");
+    }
 }

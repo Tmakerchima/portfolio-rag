@@ -14,9 +14,23 @@ import org.springframework.web.reactive.config.WebFluxConfigurer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 @Configuration
 public class AiConfig implements WebFluxConfigurer {
+
+    private final String[] allowedOrigins;
+
+    public AiConfig(@Value("${portfolio.cors.allowed-origins:http://localhost:5173}") String allowedOrigins) {
+        this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank() && !"*".equals(origin))
+                .distinct()
+                .toArray(String[]::new);
+        if (this.allowedOrigins.length == 0) {
+            throw new IllegalArgumentException("portfolio.cors.allowed-origins must contain at least one explicit origin");
+        }
+    }
 
     @Value("classpath:prompts/interview-system.st")
     private Resource systemPromptResource;
@@ -34,12 +48,15 @@ public class AiConfig implements WebFluxConfigurer {
         return new AgentToolProvider(ToolCallbacks.from(portfolioInfoTools), mcpTools);
     }
 
-    // 开发期允许所有来源跨域，上线后改为前端域名
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins("*")
+                .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST", "OPTIONS")
                 .allowedHeaders("*");
+    }
+
+    String[] allowedOrigins() {
+        return allowedOrigins.clone();
     }
 }

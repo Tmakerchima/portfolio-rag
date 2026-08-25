@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
 
@@ -8,19 +8,46 @@ interface ToolUsage {
   name: string
 }
 
-const LEGACY_SOURCES_MARKER = '@@SOURCES@@'
+interface KnowledgeSource {
+  source: string
+  section: string
+  snapshotDate: string
+  expiresAt: string
+  stale: boolean
+}
+
+interface Recommendation {
+  question: string
+}
+
+const SOURCES_MARKER = '@@SOURCES@@'
 const TOOLS_MARKER = '@@TOOLS@@'
 
 const question = ref('')
 const answer = ref('')
 const loading = ref(false)
 const toolsUsed = ref<ToolUsage[]>([])
+const sources = ref<KnowledgeSource[]>([])
 
-const presets = [
+const presets = ref([
   '马驰最近完成了哪些 GitHub 项目？',
   'EnterpriseRAG 如何保证回答可验证？',
   '最近 GitHub 上有哪些 Agent 趋势？',
-]
+])
+
+async function loadRecommendations() {
+  try {
+    const response = await fetch(`${API_BASE}/api/chat/recommendations`)
+    if (!response.ok) return
+    const items: Recommendation[] = await response.json()
+    const questions = items.map((item) => item.question).filter(Boolean)
+    if (questions.length >= 2) presets.value = questions
+  } catch {
+    // 后端不可用时保留本地最小兜底，主页仍可直接使用。
+  }
+}
+
+onMounted(loadRecommendations)
 
 async function ask(q?: string) {
   const text = q ?? question.value.trim()
@@ -30,6 +57,7 @@ async function ask(q?: string) {
   answer.value = ''
   loading.value = true
   toolsUsed.value = []
+  sources.value = []
 
   try {
     const res = await fetch(`${API_BASE}/api/chat`, {
@@ -50,7 +78,16 @@ async function ask(q?: string) {
         .filter((line) => line.startsWith('data:'))
         .map((line) => line.slice(5).replace(/^ /, ''))
         .join('\n')
-      if (!content || content.startsWith(LEGACY_SOURCES_MARKER)) return
+      if (!content) return
+
+      if (content.startsWith(SOURCES_MARKER)) {
+        try {
+          sources.value = JSON.parse(content.slice(SOURCES_MARKER.length))
+        } catch {
+          sources.value = []
+        }
+        return
+      }
 
       if (content.startsWith(TOOLS_MARKER)) {
         try {
@@ -122,6 +159,16 @@ async function ask(q?: string) {
 
       <div v-if="answer" class="chat-answer" aria-live="polite">
         <div class="answer-copy">{{ answer }}</div>
+
+        <div v-if="sources.length" class="answer-sources" aria-label="回答来源">
+          <span class="source-label">Sources</span>
+          <span v-for="source in sources" :key="source.source + source.section" class="source-item">
+            {{ source.source }}<template v-if="source.section"> / {{ source.section }}</template>
+            <small v-if="source.snapshotDate" :class="{ stale: source.stale }">
+              {{ source.stale ? '已过期' : '快照 ' + source.snapshotDate }}
+            </small>
+          </span>
+        </div>
 
         <div v-if="toolsUsed.length" class="tools-used" aria-label="本轮使用的工具">
           <span v-for="(tool, index) in toolsUsed" :key="index">

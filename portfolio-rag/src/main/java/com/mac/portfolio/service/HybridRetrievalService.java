@@ -32,10 +32,12 @@ public class HybridRetrievalService {
     // 元数据命中了用户意图类目（metadataScore >= 0.75）时给予的额外加分。
     // 背景：短问题的向量相似度往往挤在很窄的区间（如 0.28~0.31），
     // 单纯靠向量分排序会让"问教育却召回技术栈"这类错位发生，这里强制让意图命中的片段跳升。
-    private static final double INTENT_MATCH_BOOST = 0.20;
-    private static final double VECTOR_WEIGHT = 0.60;
-    private static final double LEXICAL_WEIGHT = 0.25;
-    private static final double METADATA_WEIGHT = 0.15;
+    private static final double INTENT_MATCH_BOOST = 0.30;
+    private static final double VECTOR_WEIGHT = 0.45;
+    private static final double BM25_WEIGHT = 0.35;
+    private static final double METADATA_WEIGHT = 0.20;
+    private static final double BM25_K1 = 1.2;
+    private static final double BM25_B = 0.75;
 
     private final VectorStore vectorStore;
     private final KnowledgeChunkStore chunkStore;
@@ -77,6 +79,8 @@ public class HybridRetrievalService {
         }
 
         IntentProfile intent = IntentProfile.from(question);
+        RetrievalBudget budget = RetrievalBudget.from(question, finalTopK, maxContextChars);
+        Map<String, Double> bm25Scores = bm25Scores(question, snapshot);
         Map<String, Candidate> candidates = new LinkedHashMap<>();
 
         List<Document> vectorHits = vectorSearch(question, intent.filterExpression());
@@ -87,26 +91,26 @@ public class HybridRetrievalService {
         mergeVectorHits(candidates, vectorHits);
 
         for (Document document : snapshot) {
-            double lexicalScore = lexicalScore(question, searchableText(document));
+            double bm25Score = bm25Scores.getOrDefault(key(document), 0.0);
             double metadataScore = intent.metadataScore(document);
-            if (lexicalScore >= 0.08 || metadataScore >= 0.75) {
+            if (bm25Score > 0.0 || metadataScore >= 0.75) {
                 Candidate candidate = candidates.computeIfAbsent(key(document), ignored -> new Candidate(document));
-                candidate.lexicalScore = Math.max(candidate.lexicalScore, lexicalScore);
+                candidate.bm25Score = Math.max(candidate.bm25Score, bm25Score);
                 candidate.metadataScore = Math.max(candidate.metadataScore, metadataScore);
             }
         }
 
         for (Candidate candidate : candidates.values()) {
-            candidate.lexicalScore = Math.max(candidate.lexicalScore,
-                    lexicalScore(question, searchableText(candidate.document)));
+            candidate.bm25Score = Math.max(candidate.bm25Score,
+                    bm25Scores.getOrDefault(key(candidate.document), 0.0));
             candidate.metadataScore = Math.max(candidate.metadataScore, intent.metadataScore(candidate.document));
             double intentBoost = candidate.metadataScore >= 0.75 ? INTENT_MATCH_BOOST : 0.0;
             candidate.finalScore = candidate.vectorScore * VECTOR_WEIGHT
-                    + candidate.lexicalScore * LEXICAL_WEIGHT
+                    + candidate.bm25Score * BM25_WEIGHT
                     + candidate.metadataScore * METADATA_WEIGHT
                     + intentBoost;
             if (candidate.vectorScore == 0.0) {
-                candidate.finalScore = candidate.lexicalScore * 0.65 + candidate.metadataScore * 0.35 + intentBoost;
+                candidate.finalScore = candidate.bm25Score * 0.45 + candidate.metadataScore * 0.55 + intentBoost;
             }
         }
 
@@ -119,12 +123,12 @@ public class HybridRetrievalService {
         Set<String> seenTopics = new HashSet<>();
         int contextChars = 0;
         for (Candidate candidate : ranked) {
-            if (result.size() >= finalTopK) break;
+            if (result.size() >= budget.topK()) break;
             String topic = String.valueOf(candidate.document.getMetadata().getOrDefault("topic", ""));
             if (!topic.isBlank() && !seenTopics.add(topic)) continue;
 
             String text = candidate.document.getText();
-            int remaining = maxContextChars - contextChars;
+            int remaining = budget.maxChars() - contextChars;
             if (remaining <= 0) break;
             if (text.length() > remaining) text = text.substring(0, remaining);
 
@@ -210,17 +214,65 @@ public class HybridRetrievalService {
         return Math.min(1.0, matches / (double) queryTerms.size());
     }
 
+    Map<String, Double> bm25Scores(String query, List<Document> documents) {
+        Set<String> queryTerms = terms(query);
+        if (queryTerms.isEmpty() || documents.isEmpty()) return Map.of();
+
+        List<Map<String, Integer>> documentTerms = documents.stream()
+                .map(document -> termFrequencies(searchableText(document)))
+                .toList();
+        Map<String, Integer> documentFrequency = new HashMap<>();
+        int totalLength = 0;
+        for (Map<String, Integer> frequencies : documentTerms) {
+            totalLength += frequencies.values().stream().mapToInt(Integer::intValue).sum();
+            for (String term : frequencies.keySet()) {
+                if (queryTerms.contains(term)) documentFrequency.merge(term, 1, Integer::sum);
+            }
+        }
+
+        double averageLength = Math.max(1.0, totalLength / (double) documents.size());
+        Map<String, Double> raw = new LinkedHashMap<>();
+        double max = 0.0;
+        for (int index = 0; index < documents.size(); index++) {
+            Map<String, Integer> frequencies = documentTerms.get(index);
+            int documentLength = frequencies.values().stream().mapToInt(Integer::intValue).sum();
+            double score = 0.0;
+            for (String term : queryTerms) {
+                int frequency = frequencies.getOrDefault(term, 0);
+                if (frequency == 0) continue;
+                int containingDocuments = documentFrequency.getOrDefault(term, 0);
+                double idf = Math.log(1.0 + (documents.size() - containingDocuments + 0.5)
+                        / (containingDocuments + 0.5));
+                double denominator = frequency + BM25_K1
+                        * (1.0 - BM25_B + BM25_B * documentLength / averageLength);
+                score += idf * frequency * (BM25_K1 + 1.0) / denominator;
+            }
+            raw.put(key(documents.get(index)), score);
+            max = Math.max(max, score);
+        }
+        if (max == 0.0) return Map.of();
+
+        Map<String, Double> normalized = new LinkedHashMap<>();
+        double normalizer = max;
+        raw.forEach((key, value) -> normalized.put(key, value / normalizer));
+        return normalized;
+    }
+
     private static Set<String> terms(String text) {
+        return termFrequencies(text).keySet();
+    }
+
+    private static Map<String, Integer> termFrequencies(String text) {
         String normalized = text == null ? "" : text.toLowerCase(Locale.ROOT);
-        Set<String> terms = new HashSet<>();
+        Map<String, Integer> terms = new HashMap<>();
         Matcher latinMatcher = LATIN_TOKEN.matcher(normalized);
-        while (latinMatcher.find()) terms.add(latinMatcher.group());
+        while (latinMatcher.find()) terms.merge(latinMatcher.group(), 1, Integer::sum);
         Matcher hanMatcher = HAN_RUN.matcher(normalized);
         while (hanMatcher.find()) {
             String run = hanMatcher.group();
             for (int i = 0; i < run.length() - 1; i++) {
                 String term = run.substring(i, i + 2);
-                if (!STOP_TERMS.contains(term)) terms.add(term);
+                if (!STOP_TERMS.contains(term)) terms.merge(term, 1, Integer::sum);
             }
         }
         return terms;
@@ -233,12 +285,22 @@ public class HybridRetrievalService {
     private static final class Candidate {
         private final Document document;
         private double vectorScore;
-        private double lexicalScore;
+        private double bm25Score;
         private double metadataScore;
         private double finalScore;
 
         private Candidate(Document document) {
             this.document = document;
+        }
+    }
+
+    private record RetrievalBudget(int topK, int maxChars) {
+        private static RetrievalBudget from(String question, int defaultTopK, int defaultMaxChars) {
+            String normalized = question == null ? "" : question.toLowerCase(Locale.ROOT);
+            boolean comprehensive = IntentProfile.containsAny(
+                    normalized, "全部", "所有", "完整", "详细", "全面", "总览", "一览");
+            if (!comprehensive) return new RetrievalBudget(defaultTopK, defaultMaxChars);
+            return new RetrievalBudget(Math.max(defaultTopK, 8), Math.max(defaultMaxChars, 10_000));
         }
     }
 
@@ -248,8 +310,16 @@ public class HybridRetrievalService {
             String normalized = question == null ? "" : question.toLowerCase(Locale.ROOT);
             if (containsAny(normalized, "github trend", "github trending", "github趋势", "开源趋势", "热门仓库")
                     || (normalized.contains("github")
-                    && containsAny(normalized, "趋势", "热门", "火爆", "值得关注"))) {
+                    && containsAny(normalized, "趋势", "热门", "火爆", "值得关注"))
+                    || (containsAny(normalized, "插件", "plugin", "skill")
+                    && containsAny(normalized, "趋势", "热门", "生态", "分发"))) {
                 return new IntentProfile(Set.of("trends"), "category == 'trends'", normalized);
+            }
+            if (containsAny(normalized, "工作", "经历", "公司", "道富", "乐歌", "云融")) {
+                return new IntentProfile(Set.of("career"), "category == 'career'", normalized);
+            }
+            if (containsAny(normalized, "教育", "学校", "学历", "大学", "专业", "毕业")) {
+                return new IntentProfile(Set.of("education"), "category == 'education'", normalized);
             }
             if (containsAny(normalized, "项目", "作品", "做过", "开发过", "localagent", "trendcopy", "fundlens", "rag")) {
                 return new IntentProfile(Set.of("projects"), "category == 'projects'", normalized);
@@ -257,12 +327,6 @@ public class HybridRetrievalService {
             if (containsAny(normalized, "技术栈", "技术", "能力", "熟悉", "java", "spring", "python", "ai agent")) {
                 return new IntentProfile(Set.of("skills", "projects", "career"),
                         "category in ['skills', 'projects', 'career']", normalized);
-            }
-            if (containsAny(normalized, "工作", "经历", "公司", "道富", "乐歌", "云融")) {
-                return new IntentProfile(Set.of("career"), "category == 'career'", normalized);
-            }
-            if (containsAny(normalized, "教育", "学校", "学历", "大学", "专业")) {
-                return new IntentProfile(Set.of("education"), "category == 'education'", normalized);
             }
             if (containsAny(normalized, "联系", "邮箱", "电话", "github", "博客")) {
                 return new IntentProfile(Set.of("basic"), "category == 'basic'", normalized);
@@ -280,8 +344,13 @@ public class HybridRetrievalService {
 
         private double metadataScore(Document document) {
             String category = String.valueOf(document.getMetadata().getOrDefault("category", ""));
+            String section = String.valueOf(document.getMetadata().getOrDefault("section", ""));
             String topic = String.valueOf(document.getMetadata().getOrDefault("topic", "")).toLowerCase(Locale.ROOT);
             String project = String.valueOf(document.getMetadata().getOrDefault("project", "")).toLowerCase(Locale.ROOT);
+            if (categories.contains("trends")
+                    && containsAny(normalizedQuestion, "最近", "最新", "本周", "当前", "现在")) {
+                return section.contains("自动快照") ? 1.0 : 0.65;
+            }
             for (String token : List.of("localagent", "trendcopy", "fundlens", "portfolio", "databricks", "hadoop",
                     "openviking", "ai-memory", "maka", "spring vibe bench")) {
                 if (normalizedQuestion.contains(token)) {

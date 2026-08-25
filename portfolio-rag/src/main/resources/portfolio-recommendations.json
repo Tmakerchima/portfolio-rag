@@ -1,0 +1,14 @@
+[
+  {
+    "question": "马驰最近完成了哪些 GitHub 项目？",
+    "category": "projects"
+  },
+  {
+    "question": "EnterpriseRAG 如何保证回答可验证？",
+    "category": "engineering"
+  },
+  {
+    "question": "最近 GitHub 上有哪些 Agent 趋势？",
+    "category": "trends"
+  }
+]
