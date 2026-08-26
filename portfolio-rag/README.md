@@ -1,47 +1,41 @@
-# Portfolio RAG backend
+# Portfolio RAG Backend
 
-Java 21 + Spring Boot 3.3 + Spring AI 后端，同时提供个人简历 Agent 和 EnterpriseRAG API。仓库级架构、5,000 文档切块、增量边界与成本说明见 [根 README](../README.md)。
+Portfolio RAG 的 Java 21 + Spring Boot 3.3 + Spring AI 后端，负责个人知识检索、工具调用和 SSE 流式回答。
 
-## 两条问答链路
+> EnterpriseRAG 已拆分为[独立仓库](https://github.com/Tmakerchima/EnterpriseRAG)，不属于本服务的产品边界。
 
-| API | 数据策略 | 每次请求的 DashScope 调用 |
-|---|---|---:|
-| `POST /api/chat` | 启动加载 `knowledge/**/*`；Markdown 切块 + 内存 BM25/metadata 检索，可选向量召回默认关闭 | 通常 1 次 Qwen；工具问题可能 2+ 模型回合 |
-| `GET /api/chat/recommendations` | 从服务端 JSON 读取 2～5 个推荐问题 | 0 |
-| `POST /api/enterprise/chat` | `enterprise_*` 表；可配置 PostgreSQL FTS 或 ParadeDB BM25 + PGVector + RRF | 1 次 query embedding + 1 次 Qwen |
+## API
 
-简历 SSE 包含正文、`@@SOURCES@@<json>` 和末尾的 `@@TOOLS@@<json>`；来源只提供文档、章节和快照状态，不暴露内部 chunk。Enterprise SSE 使用独立的 `@@SOURCES@@`、`@@METRICS@@` 和 `@@ERROR@@` 帧。
+| API | 用途 |
+|---|---|
+| `POST /api/chat` | 根据个人知识与动态工具生成流式回答 |
+| `GET /api/chat/recommendations` | 返回主页推荐问题 |
 
-`KnowledgeCorpusLoader` 会在启动时把 `about-mac.md`、`github-trend.md` 等文档加载到内存检索库，但不会写入、清空或重建 `vector_store`。`IngestService` 仍是受控 embedding 任务的手动 helper。Enterprise 导入同样不是启动任务，由 `eval/enterprise_rag_worker.py` 在受控 runner 中执行。
+`POST /api/chat` 使用 `text/event-stream`。响应包含正文、`@@SOURCES@@<json>` 和 `@@TOOLS@@<json>`，用于展示来源与工具调用状态。
+
+## 检索
+
+启动时，`KnowledgeCorpusLoader` 会加载 `src/main/resources/knowledge/**/*`：
+
+- `about-mac.md`：个人经历、项目与技术栈
+- `github-trend.md`：带快照日期和有效期的 GitHub 趋势
+
+查询通过 Markdown 语义切块、内存 BM25 和元数据意图召回有限上下文。博客和 GitHub 实时信息由工具按需获取，不会把整份知识文档发送给模型。
 
 ## 本地启动
-
-服务端环境变量：
 
 ```text
 DASHSCOPE_API_KEY=<secret>
 SUPABASE_DB_PASSWORD=<secret>
 GITHUB_MCP_PAT=<optional secret>
-PORTFOLIO_CORS_ALLOWED_ORIGINS=http://localhost:5173,https://your-frontend.example
-ENTERPRISE_RAG_ADMIN_TOKEN=<secret>
-ENTERPRISE_RAG_ACTIVE_CORPUS_ID=<validated corpus uuid>
-ENTERPRISE_RAG_MAX_CHUNK_TOKENS=700
-ENTERPRISE_RAG_CHUNK_OVERLAP_TOKENS=80
-ENTERPRISE_RAG_CONTEXTUAL_ENABLED=false
-ENTERPRISE_RAG_LEXICAL_BACKEND=POSTGRES_FTS
-ENTERPRISE_RAG_LEXICAL_FAIL_OPEN=true
-ENTERPRISE_RAG_BM25_URL=<optional ParadeDB JDBC URL>
-ENTERPRISE_RAG_BM25_USERNAME=<optional secret>
-ENTERPRISE_RAG_BM25_PASSWORD=<optional secret>
-ENTERPRISE_RAG_RERANKER_MODE=HEURISTIC
-ENTERPRISE_RAG_AGENTIC_ENABLED=false
+PORTFOLIO_CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 
 ```powershell
 mvn spring-boot:run
 ```
 
-验证简历接口：
+验证接口：
 
 ```powershell
 Invoke-WebRequest -Uri "http://localhost:8080/api/chat" `
@@ -51,37 +45,16 @@ Invoke-WebRequest -Uri "http://localhost:8080/api/chat" `
   -Body '{"question":"马驰做过哪些 AI 项目？"}'
 ```
 
-验证 Enterprise 状态与查询：
+## 测试
 
 ```powershell
-Invoke-RestMethod "http://localhost:8080/api/enterprise/health"
-
-Invoke-WebRequest -Uri "http://localhost:8080/api/enterprise/chat" `
-  -Method POST `
-  -ContentType "application/json" `
-  -Headers @{Accept="text/event-stream"} `
-  -Body '{"question":"What are the default limits for multipart uploads?","role":"engineering","strategy":"HYBRID"}'
+mvn test
 ```
 
 ## 部署
 
 - Railway Root Directory：`portfolio-rag`
-- 个人主页 Vercel Root Directory：`portfolio-frontend`，公开变量 `VITE_API_BASE`
-- Enterprise Vercel Root Directory：`enterprise-rag-frontend`，公开变量 `VITE_API_BASE_URL`
-- 数据库与模型密钥只能放在 Railway 服务端环境变量中。
+- Vercel Root Directory：`portfolio-frontend`
+- 前端公开变量：`VITE_API_BASE`
 
-生产 Enterprise corpus 必须先写入 STAGING，完成计数/抽样/查询验收后再激活。Railway redeploy 只读取 ACTIVE corpus，不会重新切块或调用 embedding。
-
-数据库必须依次应用 V1、V2、V3、V4。V3 后 `enterprise_chunks.content` 是原始证据，`contextual_prefix` 是生成的检索背景，`index_content` 用于 embedding 和 lexical 检索。默认使用 FTS；接入 ParadeDB 后可按 [Contextual BM25 部署文档](../docs/enterprise-contextual-bm25.md) 切换到真正的 BM25。Contextualizer 与二次查询规划均默认关闭；开启会产生额外模型调用。
-
-## 进一步阅读
-
-- [EnterpriseRAG 端到端流程](../docs/enterprise-rag-end-to-end-flow.md)
-- [部署手册](../docs/enterprise-rag-deployment.md)
-- [容量报告](../docs/enterprise-rag-capacity-report.md)
-- [灾备与回滚](../docs/enterprise-rag-disaster-recovery.md)
-- [离线评估](../docs/enterprise-rag-evaluation.md)
-
-## 安全
-
-不要提交真实 API Key、数据库密码、管理 token 或包含它们的日志。曾经暴露过的凭据应立即轮换，并同步更新 Railway 环境变量。
+数据库、模型和 GitHub 凭据只能保存在后端环境变量中。

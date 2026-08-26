@@ -58,7 +58,7 @@
 
 个人知识库由 `about-mac.md` 和带日期、有效期的 `github-trend.md` 等文档组成。应用启动时按 Markdown 标题做语义切块，在线查询结合内存 BM25、元数据意图和可用的向量结果进行混合检索，只把命中的有限上下文交给 Qwen，并向前端返回文档级来源与快照状态。这样既能让趋势文档进入真实检索，也避免每次请求重复发送整份档案。
 
-同一代码库还保留 EnterpriseRAG 演示链路，两条数据路径明确隔离。项目的关键挑战是同时处理静态知识、动态工具与流式交互；解决方式包括稳定 chunk id、有限上下文、工具调用追踪、GitHub MCP 失败降级，以及个人知识与企业语料分表分服务。
+Portfolio RAG 只服务个人作品集问答。项目重点是协调静态知识、动态工具与流式交互，通过稳定 chunk id、有限上下文、工具调用追踪和 GitHub MCP 失败降级保持回答简洁、可追溯。
 
 技术栈：Java 21、Spring Boot、Spring AI、WebFlux、Hybrid Retrieval、PGVector、Function Calling、MCP、Vue 3、TypeScript、Vercel、Railway、Supabase。
 
@@ -66,9 +66,9 @@
 
 仓库：https://github.com/Tmakerchima/EnterpriseRAG
 
-独立版 EnterpriseRAG 把 versioned corpus、SQL 层 tenant/ACL、PGVector、PostgreSQL FTS 或 ParadeDB BM25、RRF、可选 reranker、grounded SSE、telemetry、反馈评测和 bad-case 回灌放进同一条可复现闭环。
+EnterpriseRAG 是与 Portfolio RAG 完全分离的企业知识库项目。它围绕 versioned corpus、tenant/ACL、PGVector、BM25、RRF、可选 reranker、grounded SSE 和评测闭环构建可验证的检索链路。
 
-这个项目重点解决的不是“能回答”而是“答案能否被验证”。每次请求携带 request id 与 trace id，前端只展示服务端真实返回的来源和指标；没有外部数据库、模型或 benchmark 时，报告会明确标记 `NOT_EXECUTED` 或 `SKIPPED_EXTERNAL_DEPENDENCY`，不会用 fixture 数据冒充真实效果。评测包将 retrieval、generation、citation、security 和 performance 指标分开，支持 baseline/candidate 比较、确定性 triage 与 regression promotion。
+每次请求保留 request id、trace id、来源与指标；外部依赖不可用时会明确标记未执行状态，不用模拟数据冒充真实结果。
 
 技术栈：Java 21、Spring Boot WebFlux、Spring AI、PostgreSQL、PGVector、ParadeDB BM25、RRF、Python evaluation package、Vue 3、Docker。
 
@@ -135,12 +135,12 @@ FundLens 覆盖中国场外基金、A 股和美股，把多期限趋势、风险
 
 | 能力方向 | 主要技术 | 项目证据 |
 |---|---|---|
-| Java 后端 | Java 21、Spring Boot、WebFlux、Spring AI、JDBC | 银行额度中心、Portfolio RAG、EnterpriseRAG、TrendCopy、Spring Vibe Bench |
-| RAG 检索 | Markdown 语义切块、PGVector、FTS/BM25、RRF、reranker、ACL | Portfolio RAG、EnterpriseRAG |
+| Java 后端 | Java 21、Spring Boot、WebFlux、Spring AI、JDBC | 银行额度中心、Portfolio RAG、EnterpriseRAG（独立仓库）、TrendCopy、Spring Vibe Bench |
+| RAG 检索 | Markdown 语义切块、PGVector、FTS/BM25、RRF、reranker、ACL | Portfolio RAG、EnterpriseRAG（独立仓库） |
 | Agent 工程 | Tool Calling、MCP、Agent Loop、权限模式、SSE/NDJSON | Portfolio RAG、LocalAgent |
 | 数据与云 | PostgreSQL、Supabase、Databricks、Delta Lake、Azure Blob | Life Adventure、TrendCopy、美国道富项目 |
-| 产品与前端 | Vue 3、TypeScript、Next.js、React、HTML/CSS/JavaScript | 个人主页、EnterpriseRAG、Life Adventure、LocalAgent |
-| 评测与安全 | retrieval/generation/citation 指标、静态规则、RLS、危险命令拦截 | EnterpriseRAG、Spring Vibe Bench、Life Adventure、LocalAgent |
+| 产品与前端 | Vue 3、TypeScript、Next.js、React、HTML/CSS/JavaScript | 个人主页、EnterpriseRAG（独立仓库）、Life Adventure、LocalAgent |
+| 评测与安全 | retrieval/generation/citation 指标、静态规则、RLS、危险命令拦截 | EnterpriseRAG（独立仓库）、Spring Vibe Bench、Life Adventure、LocalAgent |
 | 部署与交付 | Docker、Vercel、Railway、Harness CI/CD、GitHub Actions | 多个公开项目与美国道富工作经历 |
 
 ## 工程风格

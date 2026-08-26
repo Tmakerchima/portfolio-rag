@@ -36,7 +36,7 @@ time_window: weekly+monthly
 
 本周与马驰技术方向最相关的信号，不是又出现一个单纯的聊天 UI，而是 Agent 工程正在向基础设施层深入：上下文被做成可观测的数据系统，跨 Agent 记忆与交接成为独立能力，运行时强调本地优先和审计记录，插件/Skill 开始形成标准化生态，安全扫描也从模型扩展到 MCP、Agent 和 Skill 供应链。
 
-这些趋势与马驰现有项目形成直接对应：Portfolio RAG 与 EnterpriseRAG 关注检索和证据；LocalAgent 关注本地运行、权限与工具记录；Spring Vibe Bench 关注 AI 生成代码的确定性审查；Life Adventure 与 TrendCopy 则体现 Agent 在垂直产品工作流中的落地。
+这些趋势与马驰现有项目形成直接对应：Portfolio RAG 关注个人知识检索，独立项目 EnterpriseRAG 关注企业证据链；LocalAgent 关注本地运行、权限与工具记录；Spring Vibe Bench 关注 AI 生成代码的确定性审查；Life Adventure 与 TrendCopy 则体现 Agent 在垂直产品工作流中的落地。
 
 ## GitHub 热门仓库观察
 
@@ -46,7 +46,7 @@ time_window: weekly+monthly
 - 本周 Trending 增量快照：约 4,048 stars this week
 - 方向：把 memory、resource 和 skill 统一为 `viking://` 虚拟文件系统，并使用 L0 摘要、L1 概览、L2 详情进行分层加载。
 - 值得关注：检索不再只是“向量库 top-k”，而是可浏览、可分层、可观察的 context engineering。每次检索保留路径轨迹，便于调试为什么取到某段上下文。
-- 与马驰项目的关系：Portfolio RAG 可借鉴分层上下文和 retrieval trace；EnterpriseRAG 可继续加强“候选 → 最终上下文”的可解释轨迹与 token budget。
+- 与马驰项目的关系：Portfolio RAG 可借鉴分层上下文和 retrieval trace；独立的 EnterpriseRAG 可继续加强“候选 → 最终上下文”的可解释轨迹与 token budget。
 
 ### akitaonrails/ai-memory — 跨 Coding Agent 长期记忆
 
@@ -109,9 +109,10 @@ AI-Infra-Guard 的热度说明，安全关注点已经扩展到 Agent、MCP、Sk
 
 ## 与马驰项目的下一步结合
 
-1. **Portfolio RAG / EnterpriseRAG**：增加检索轨迹、知识更新时间、source-level freshness 和 context budget 展示；对趋势问题明确返回快照日期。
-2. **LocalAgent**：设计 append-only 运行日志、跨会话 handoff 和可恢复任务，同时维持 Plan/Edits/Auto 的权限差异。
-3. **Spring Vibe Bench**：探索 MCP/Skill 配置规则，例如危险命令、过宽权限、明文凭据、未知远程 server 和缺少版本固定。
+1. **Portfolio RAG**：展示知识更新时间与 source-level freshness，并为趋势问题返回快照日期。
+2. **EnterpriseRAG（独立项目）**：继续完善检索轨迹、证据链和 context budget。
+3. **LocalAgent**：设计 append-only 运行日志、跨会话 handoff 和可恢复任务，同时维持 Plan/Edits/Auto 的权限差异。
+4. **Spring Vibe Bench**：探索 MCP/Skill 配置规则，例如危险命令、过宽权限、明文凭据、未知远程 server 和缺少版本固定。
 
 ## GitHub Trend 更新规则
 

@@ -17,7 +17,7 @@ const projects: Project[] = [
     description: '带权限控制、混合检索与可插拔重排的企业知识库助手。',
     stack: 'Java 21 · Spring AI · PGVector · RRF',
     links: [
-      { label: 'GitHub', href: 'https://github.com/Tmakerchima/portfolio-rag' },
+      { label: 'GitHub', href: 'https://github.com/Tmakerchima/EnterpriseRAG' },
       ...(import.meta.env.VITE_ENTERPRISE_RAG_LIVE_URL?.trim()
         ? [{ label: 'Live', href: import.meta.env.VITE_ENTERPRISE_RAG_LIVE_URL.trim() }]
         : []),

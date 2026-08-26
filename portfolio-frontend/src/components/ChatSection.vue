@@ -31,7 +31,7 @@ const sources = ref<KnowledgeSource[]>([])
 
 const presets = ref([
   '马驰最近完成了哪些 GitHub 项目？',
-  'EnterpriseRAG 如何保证回答可验证？',
+  'Portfolio RAG 如何结合知识检索和实时工具？',
   '最近 GitHub 上有哪些 Agent 趋势？',
 ])
 
