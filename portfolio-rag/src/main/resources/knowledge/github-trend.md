@@ -1,7 +1,7 @@
 ---
 document_type: github_trend
-snapshot_date: 2026-08-25
-expires_at: 2026-09-08
+snapshot_date: 2026-08-31
+expires_at: 2026-09-14
 analysis_date: 2026-08-25
 analysis_expires_at: 2026-09-08
 source_url: https://github.com/trending
@@ -9,7 +9,7 @@ time_window: weekly+monthly
 ---
 # GitHub Trend 追踪 — AI Agent、RAG 与开发者工具
 
-> 快照日期：2026-08-25
+> 快照日期：2026-08-31
 > 数据窗口：GitHub Trending · This week + This month
 > 官方来源：https://github.com/trending?since=weekly 与 https://github.com/trending?since=monthly
 > 入选规则：满足以下任一条件即可进入候选：最近一周 Trending、最近一月 Trending，或与 Agent 相关且累计 Star ≥ 50,000。累计 Star 取自 Trending 页面或 GitHub Repository Search API，并在 Repository API 可用时复核。
@@ -20,14 +20,14 @@ time_window: weekly+monthly
 <!-- TREND_SNAPSHOT_START -->
 | 仓库 | 入选信号 | 累计 Stars | 周/月新增 | 简介 |
 |---|---|---:|---:|---|
-| [harry0703/MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) | 近一周 / 高 Star | 116,193 | 周 +10,647 | 利用 AI 大模型和自动化工作流，根据主题或关键词一键生成高清短视频。Generate HD short videos from a topic or keyword with an automated AI workflow. |
-| [TencentCloud/TencentDB-Agent-Memory](https://github.com/TencentCloud/TencentDB-Agent-Memory) | 近一月 | 24,359 | 月 +15,093 | TencentDB Agent Memory is a team-level memory hub for AI Agents — turning conversations, docs, and code into four reusable memory assets (Chat Memory, Skill, LLM-Wiki, Code-Graph) that are governed, shared, and equipped across agents and frameworks. |
-| [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd) | 近一月 | 24,039 | 月 +14,346 | A skill to stop your coding agent from burying the answer. ADHD-friendly output. |
-| [volcengine/OpenViking](https://github.com/volcengine/OpenViking) | 近一周 / 近一月 | 33,129 | 周 +4,048 / 月 +5,784 | Self-evolving Context Database for AI Agents. Unify Agent Memory, Knowledge RAG and Skills. |
-| [zhaoxuya520/reverse-skill](https://github.com/zhaoxuya520/reverse-skill) | 近一月 | 28,975 | 月 +19,889 | Reverse Engineering / Authorized Penetration Testing / Security Research Skill Router Pack AI-powered routing + On-demand toolchain bootstrapping + Self-evolving knowledge base Supports Claude Code, Kiro, Cursor, Cline, and other AI coding clients 逆向/渗透/安全技能路由包 - AI 自动路由 + 按需自举工具链 + 自动进化经验库 \| 支持 Claude Code / Kiro / Cursor / Cline 等代码 AI 客户端 |
-| [anthropics/claude-plugins-community](https://github.com/anthropics/claude-plugins-community) | 近一周 | 1,505 | 周 +877 | Community plugin marketplace for Claude Cowork and Claude Code. Read-only mirror — submit plugins at clau.de/plugin-directory-submission. |
-| [microsoft/AI-For-Beginners](https://github.com/microsoft/AI-For-Beginners) | 近一月 / 高 Star | 66,862 | 月 +14,152 | 12 Weeks, 24 Lessons, AI for All! |
-| [virgiliojr94/book-to-skill](https://github.com/virgiliojr94/book-to-skill) | 近一月 | 25,371 | 月 +15,714 | Turn any technical book PDF into a Claude Code skill — ready to study, reference, and use while you work. |
+| [freestylefly/awesome-gpt-image-2](https://github.com/freestylefly/awesome-gpt-image-2) | 近一周 / 近一月 | 25,938 | 周 +13,413 / 月 +16,908 | Prompt as Code \| GPT-Image2 工业级提示词引擎与模板库，530+ 个案例逆向工程，20+ 套工业级模板，并提炼出Skills，持续更新中 |
+| [anthropics/claude-plugins-community](https://github.com/anthropics/claude-plugins-community) | 近一周 / 近一月 | 2,950 | 周 +2,162 / 月 +2,543 | Community plugin marketplace for Claude Cowork and Claude Code. Read-only mirror — submit plugins at clau.de/plugin-directory-submission. |
+| [tt-a1i/archify](https://github.com/tt-a1i/archify) | 近一周 / 近一月 | 35,944 | 周 +18,103 / 月 +25,275 | Agent skill for beautiful, verifiable architecture, workflow, sequence, data-flow, and lifecycle diagrams—self-contained HTML with motion and crisp export. |
+| [TencentCloud/TencentDB-Agent-Memory](https://github.com/TencentCloud/TencentDB-Agent-Memory) | 近一月 | 25,319 | 月 +15,913 | TencentDB Agent Memory is a team-level memory hub for AI Agents — turning conversations, docs, and code into four reusable memory assets (Chat Memory, Skill, LLM-Wiki, Code-Graph) that are governed, shared, and equipped across agents and frameworks. |
+| [apache/maka](https://github.com/apache/maka) | 近一周 / 近一月 | 4,244 | 周 +1,973 / 月 +3,257 | Apache Maka (Incubating) is a local-first AI agent workspace. Model messages, tool calls, tool results, permission decisions, and termination events are recorded as an append-only log. |
+| [tashfeenahmed/freellmapi](https://github.com/tashfeenahmed/freellmapi) | 近一周 | 23,024 | 周 +3,037 | 7.4 billion tokens per month. 34 free LLM providers. 635 free model endpoints. All behind one /v1 endpoint, plus any custom OpenAI-compatible endpoint. Smart routing, automatic failover, encrypted keys. Personal experimentation only. |
+| [obra/superpowers](https://github.com/obra/superpowers) | 高 Star | 279,786 | — | An agentic skills framework & software development methodology that works. |
+| [affaan-m/ECC](https://github.com/affaan-m/ECC) | 高 Star | 244,849 | — | The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond. |
 <!-- TREND_SNAPSHOT_END -->
 
 本表由定时任务合并 GitHub Trending weekly 与 monthly 页面，并用 Repository API 补充累计 Star；下方深度观察由人工维护，并保留独立的分析日期和有效期。
