@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8080'
+const API_BASE = (import.meta.env.VITE_API_BASE || 'http://localhost:8080').replace(/\/+$/, '')
 
 interface ToolUsage {
   origin: string
@@ -24,14 +24,16 @@ const SOURCES_MARKER = '@@SOURCES@@'
 const TOOLS_MARKER = '@@TOOLS@@'
 
 const question = ref('')
+const asked = ref('')
 const answer = ref('')
+const error = ref('')
 const loading = ref(false)
 const toolsUsed = ref<ToolUsage[]>([])
 const sources = ref<KnowledgeSource[]>([])
 
 const presets = ref([
   '马驰最近完成了哪些 GitHub 项目？',
-  'Portfolio RAG 如何结合知识检索和实时工具？',
+  'EnterpriseRAG 的检索链路是怎样的？',
   '最近 GitHub 上有哪些 Agent 趋势？',
 ])
 
@@ -49,12 +51,19 @@ async function loadRecommendations() {
 
 onMounted(loadRecommendations)
 
+function toolLabel(tool: ToolUsage) {
+  const origin = tool.origin === 'mcp' ? 'MCP' : 'Function'
+  return tool.name ? `${origin} / ${tool.name}` : origin
+}
+
 async function ask(q?: string) {
-  const text = q ?? question.value.trim()
+  const text = (q ?? question.value).trim()
   if (!text || loading.value) return
 
-  question.value = text
+  asked.value = text
+  question.value = ''
   answer.value = ''
+  error.value = ''
   loading.value = true
   toolsUsed.value = []
   sources.value = []
@@ -66,7 +75,7 @@ async function ask(q?: string) {
       body: JSON.stringify({ question: text }),
     })
 
-    if (!res.ok || !res.body) throw new Error('请求失败')
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -119,8 +128,12 @@ async function ask(q?: string) {
 
     sseBuffer += decoder.decode().replace(/\r\n/g, '\n')
     if (sseBuffer.trim()) handleSseEvent(sseBuffer)
+
+    if (!answer.value.trim()) error.value = '这次没有拿到回答，请换个问法再试一次。'
   } catch {
-    answer.value = '暂时无法连接，请稍后再试。'
+    error.value = answer.value
+      ? '回答中断了，以上是已收到的部分内容。'
+      : 'AI 服务暂时无法连接，请稍后再试。'
   } finally {
     loading.value = false
   }
@@ -132,12 +145,19 @@ async function ask(q?: string) {
     <div class="section-header chat-heading">
       <p class="eyebrow">Portfolio AI</p>
       <h2 id="chat-title">Ask me anything.</h2>
-      <p>想快速了解我的经历或项目？直接问就好。</p>
+      <p>想快速了解我的经历或项目？直接问就好。回答基于个人知识库，并会按需查询 GitHub 与博客。</p>
     </div>
 
     <div class="chat-workspace" :aria-busy="loading">
       <div class="prompt-list" aria-label="推荐问题">
-        <button v-for="preset in presets" :key="preset" type="button" @click="ask(preset)">
+        <button
+          v-for="preset in presets"
+          :key="preset"
+          type="button"
+          :class="{ active: preset === asked }"
+          :disabled="loading"
+          @click="ask(preset)"
+        >
           {{ preset }}
         </button>
       </div>
@@ -152,13 +172,17 @@ async function ask(q?: string) {
           autocomplete="off"
           :disabled="loading"
         />
-        <button type="submit" :disabled="loading" :aria-label="loading ? '正在思考' : '发送问题'">
+        <button type="submit" :disabled="loading || !question.trim()" :aria-label="loading ? '正在思考' : '发送问题'">
           {{ loading ? '…' : '→' }}
         </button>
       </form>
 
-      <div v-if="answer" class="chat-answer" aria-live="polite">
-        <div class="answer-copy">{{ answer }}</div>
+      <div v-if="asked" class="chat-answer" aria-live="polite">
+        <p class="answer-question">{{ asked }}</p>
+
+        <p v-if="loading && !answer" class="answer-thinking">正在检索与思考<span class="thinking-dots"></span></p>
+        <div v-if="answer" class="answer-copy">{{ answer }}</div>
+        <p v-if="error" class="answer-error">{{ error }}</p>
 
         <div v-if="sources.length" class="answer-sources" aria-label="回答来源">
           <span class="source-label">Sources</span>
@@ -171,9 +195,7 @@ async function ask(q?: string) {
         </div>
 
         <div v-if="toolsUsed.length" class="tools-used" aria-label="本轮使用的工具">
-          <span v-for="(tool, index) in toolsUsed" :key="index">
-            {{ tool.origin === 'mcp' ? 'MCP' : 'Function' }}{{ tool.name ? ' / ' + tool.name : '' }}
-          </span>
+          <span v-for="(tool, index) in toolsUsed" :key="index">{{ toolLabel(tool) }}</span>
         </div>
       </div>
     </div>
