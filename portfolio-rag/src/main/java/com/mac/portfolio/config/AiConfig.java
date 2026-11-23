@@ -1,5 +1,6 @@
 package com.mac.portfolio.config;
 
+import com.mac.portfolio.tool.GitHubProjectTools;
 import com.mac.portfolio.tool.PortfolioInfoTools;
 import com.mac.portfolio.tool.AgentToolProvider;
 import org.springframework.ai.chat.client.ChatClient;
@@ -44,8 +45,9 @@ public class AiConfig implements WebFluxConfigurer {
 
     @Bean
     public AgentToolProvider agentToolProvider(PortfolioInfoTools portfolioInfoTools,
+                                               GitHubProjectTools gitHubProjectTools,
                                                ToolCallbackProvider mcpTools) {
-        return new AgentToolProvider(ToolCallbacks.from(portfolioInfoTools), mcpTools);
+        return new AgentToolProvider(ToolCallbacks.from(portfolioInfoTools, gitHubProjectTools), mcpTools);
     }
 
     @Override

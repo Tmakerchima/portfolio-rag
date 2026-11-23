@@ -28,6 +28,7 @@ Portfolio RAG 的 Java 21 + Spring Boot 3.3 + Spring AI 后端，负责个人知
 DASHSCOPE_API_KEY=<secret>
 SUPABASE_DB_PASSWORD=<secret>
 GITHUB_MCP_PAT=<optional secret>
+GITHUB_TOKEN=<optional secret，未配置时复用 GITHUB_MCP_PAT，再不行走匿名额度>
 PORTFOLIO_CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 

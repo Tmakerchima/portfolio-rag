@@ -11,17 +11,22 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class McpConfig {
 
-    @Value("${github.mcp-pat}")
+    // PAT 可选：缺失时不再阻止应用启动，MCP 握手失败由 AgentToolProvider 降级处理，
+    // “最近 GitHub 项目”则由不依赖 MCP 的 GitHubProjectTools 回答。
+    @Value("${github.mcp-pat:}")
     private String githubMcpPat;
 
     @Bean
     public WebClient.Builder mcpWebClientBuilder() {
-        return WebClient.builder()
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + githubMcpPat)
+        WebClient.Builder builder = WebClient.builder()
                 // 只暴露个人网站会使用的只读工具，降低工具描述占用并提高 LLM 自主选工具的准确率。
                 .defaultHeader("X-MCP-Tools",
                         "get_me,search_repositories,search_issues,search_pull_requests," +
                                 "get_file_contents,list_commits,get_latest_release,list_releases")
                 .defaultHeader("X-MCP-Readonly", "true");
+        if (githubMcpPat != null && !githubMcpPat.isBlank()) {
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + githubMcpPat.trim());
+        }
+        return builder;
     }
 }

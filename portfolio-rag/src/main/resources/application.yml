@@ -125,7 +125,13 @@ enterprise:
     max-retries: ${ENTERPRISE_RAG_MAX_RETRIES:5}
 
 github:
-  mcp-pat: ${GITHUB_MCP_PAT}
+  # 可选：未配置时应用照常启动，只是不提供 GitHub MCP 工具。
+  mcp-pat: ${GITHUB_MCP_PAT:}
+  # 主页“最近 GitHub 项目”走 REST API 固定查询这个账号，不依赖 MCP 是否可用。
+  owner: ${GITHUB_OWNER:Tmakerchima}
+  # 可选：有 token 时额度 5000 次/小时；未配置时用匿名额度（60 次/小时，结果缓存 10 分钟）。
+  token: ${GITHUB_TOKEN:${GITHUB_MCP_PAT:}}
+  cache-ttl: PT10M
 
 logging:
   level:
